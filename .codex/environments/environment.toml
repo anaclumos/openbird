@@ -8,4 +8,4 @@ script = ""
 [[actions]]
 name = "Run"
 icon = "run"
-command = "swift run OpenbirdApp"
+command = "./scripts/run-dev-app.sh \"$HOME/Applications/Openbird.app\""
