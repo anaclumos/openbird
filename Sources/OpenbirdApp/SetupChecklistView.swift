@@ -13,18 +13,32 @@ struct SetupChecklistView: View {
             }
 
             VStack(alignment: .leading, spacing: 16) {
-                permissionRow(
-                    title: "Accessibility access",
-                    description: "Needed to read the active window tree and build the local activity log.",
-                    isComplete: model.accessibilityTrusted
-                ) {
-                    HStack(spacing: 12) {
-                        Button("Request Accessibility Access") {
-                            model.requestAccessibilityPermission()
+                VStack(alignment: .leading, spacing: 6) {
+                    permissionRow(
+                        title: "Accessibility access",
+                        description: "Needed to read the active window tree and build the local activity log.",
+                        isComplete: model.accessibilityTrusted
+                    ) {
+                        HStack(spacing: 12) {
+                            Button("Request Accessibility Access") {
+                                model.requestAccessibilityPermission()
+                            }
+                            Button("Open Accessibility Settings") {
+                                model.openAccessibilitySettings()
+                            }
                         }
-                        Button("Open Accessibility Settings") {
-                            model.openAccessibilitySettings()
+                    }
+                    if let help = model.accessibilityManualGrantHelp,
+                       let path = model.accessibilityManualGrantPath,
+                       model.accessibilityTrusted == false {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(help)
+                                .foregroundStyle(.secondary)
+                            Text(path)
+                                .font(.system(.caption, design: .monospaced))
+                                .textSelection(.enabled)
                         }
+                        .padding(.leading, 36)
                     }
                 }
                 permissionRow(
@@ -59,13 +73,6 @@ struct SetupChecklistView: View {
                     .font(.headline)
                 Text(description)
                     .foregroundStyle(.secondary)
-                if let path = model.accessibilityManualGrantPath, isComplete == false {
-                    Text("If you launched from source, macOS may show this as \(model.accessibilityTargetName) instead of Openbird. If it does not appear automatically, use the + button in Accessibility settings and add:")
-                        .foregroundStyle(.secondary)
-                    Text(path)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                }
                 actions()
                     .padding(.top, 8)
             }

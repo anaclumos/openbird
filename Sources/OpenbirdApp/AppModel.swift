@@ -90,6 +90,19 @@ final class AppModel: ObservableObject {
         return Bundle.main.executableURL?.path
     }
 
+    var accessibilityManualGrantHelp: String? {
+        guard accessibilityManualGrantPath != nil else {
+            return nil
+        }
+
+        if let executablePath = Bundle.main.executableURL?.path,
+           executablePath.contains("/DerivedData/") {
+            return "This copy is running from Xcode, not from a packaged Openbird.app. macOS may list it as \(accessibilityTargetName). If it does not appear automatically, use the + button in Accessibility settings and add:"
+        }
+
+        return "This copy is running directly from a built executable, not from a packaged Openbird.app. macOS may list it as \(accessibilityTargetName). If it does not appear automatically, use the + button in Accessibility settings and add:"
+    }
+
     var activeProvider: ProviderConfig? {
         providerConfigs.first { $0.id == settings.activeProviderID && $0.isEnabled }
     }
