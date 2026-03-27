@@ -55,7 +55,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
                 return
             }
 
-            guard let snapshot = snapshotter.snapshotFrontmostWindow() else {
+            guard let snapshot = await MainActor.run(body: { snapshotter.snapshotFrontmostWindow() }) else {
                 try await updateCollectorStatus("idle")
                 return
             }
