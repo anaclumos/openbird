@@ -6,10 +6,6 @@ struct RootView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: $model.selection) {
-                if model.needsOnboarding {
-                    Label("Onboarding", systemImage: "lock.shield")
-                        .tag(AppModel.SidebarItem.onboarding)
-                }
                 Label("Today", systemImage: "sun.max")
                     .tag(AppModel.SidebarItem.today)
                 Label("Chat", systemImage: "bubble.left.and.bubble.right")
@@ -21,8 +17,6 @@ struct RootView: View {
         } detail: {
             Group {
                 switch model.selection {
-                case .onboarding:
-                    OnboardingView(model: model)
                 case .today:
                     TodayView(model: model)
                 case .chat:

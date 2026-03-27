@@ -4,7 +4,6 @@ import OpenbirdKit
 @MainActor
 final class AppModel: ObservableObject {
     enum SidebarItem: String, CaseIterable, Identifiable {
-        case onboarding
         case today
         case chat
         case settings
@@ -12,8 +11,6 @@ final class AppModel: ObservableObject {
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .onboarding:
-                return "Onboarding"
             case .today:
                 return "Today"
             case .chat:
@@ -24,7 +21,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    @Published var selection: SidebarItem = .onboarding
+    @Published var selection: SidebarItem = .today
     @Published var settings = AppSettings()
     @Published var providerConfigs: [ProviderConfig] = []
     @Published var exclusions: [ExclusionRule] = []
@@ -111,10 +108,6 @@ final class AppModel: ObservableObject {
                 editingProvider = activeProvider
             } else if let first = providerConfigs.first {
                 editingProvider = first
-            }
-
-            if needsOnboarding == false, selection == .onboarding {
-                selection = .today
             }
 
             let dayRange = Calendar.current.dayRange(for: selectedDay)

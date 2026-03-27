@@ -28,6 +28,9 @@ struct TodayView: View {
             if let journal = model.todayJournal {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
+                        if model.needsOnboarding {
+                            SetupChecklistView(model: model)
+                        }
                         summaryHeader(journal)
                         summaryCard(journal.markdown)
 
@@ -56,11 +59,18 @@ struct TodayView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                 }
             } else {
-                ContentUnavailableView(
-                    "No daily summary yet",
-                    systemImage: "doc.text.magnifyingglass",
-                    description: Text("Capture some activity, then generate a clean summary from your local logs.")
-                )
+                VStack(alignment: .leading, spacing: 20) {
+                    if model.needsOnboarding {
+                        SetupChecklistView(model: model)
+                    }
+
+                    ContentUnavailableView(
+                        "No daily summary yet",
+                        systemImage: "doc.text.magnifyingglass",
+                        description: Text("Capture some activity, then generate a clean summary from your local logs.")
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .padding(28)

@@ -1,16 +1,16 @@
 import SwiftUI
 
-struct OnboardingView: View {
+struct SetupChecklistView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Text("Openbird")
-                .font(.system(size: 40, weight: .semibold))
-
-            Text("A local-first activity journal for macOS.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Finish setup")
+                    .font(.title2.weight(.semibold))
+                Text("Openbird starts in Today now. Turn on capture and connect a provider here when you are ready.")
+                    .foregroundStyle(.secondary)
+            }
 
             VStack(alignment: .leading, spacing: 16) {
                 permissionRow(
@@ -34,7 +34,7 @@ struct OnboardingView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack {
+            HStack(spacing: 12) {
                 Button("Request Accessibility Access") {
                     model.requestAccessibilityPermission()
                 }
@@ -45,17 +45,10 @@ struct OnboardingView: View {
                     model.selection = .settings
                 }
             }
-
-            if model.needsOnboarding == false {
-                Button("Continue to Today") {
-                    model.selection = .today
-                }
-                .buttonStyle(.borderedProminent)
-            }
-
-            Spacer()
         }
-        .padding(40)
+        .padding(24)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private func permissionRow(title: String, description: String, isComplete: Bool) -> some View {
