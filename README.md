@@ -39,3 +39,11 @@ swift run OpenbirdCollector
 ```bash
 swift test
 ```
+
+## CI
+
+GitHub Actions runs the package build and test workflow on:
+
+- pushes to `main`
+- pull requests
+- manual runs from the Actions tab via `workflow_dispatch`
