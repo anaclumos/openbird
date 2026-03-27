@@ -90,10 +90,6 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Capture")
                 .font(.title3.bold())
-            Toggle("Pause capture", isOn: Binding(
-                get: { model.settings.capturePaused },
-                set: { _ in model.toggleCapturePaused() }
-            ))
             Stepper("Retention days: \(model.settings.retentionDays)", value: Binding(
                 get: { model.settings.retentionDays },
                 set: { model.updateRetentionDays($0) }
