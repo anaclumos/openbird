@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, for example v0.1.0"
+        required: true
+        type: string
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve tag
+        id: meta
+        shell: bash
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ -z "${TAG}" ]]; then
+            echo "Tag is required" >&2
+            exit 1
+          fi
+
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Show toolchain
+        run: |
+          swift --version
+          xcodebuild -version
+
+      - name: Build release binaries
+        run: swift build -c release
+
+      - name: Package release artifacts
+        run: |
+          chmod +x scripts/package-release.sh
+          scripts/package-release.sh "${{ steps.meta.outputs.tag }}" dist
+
+      - name: Publish GitHub release
+        shell: bash
+        run: |
+          TAG="${{ steps.meta.outputs.tag }}"
+          ARCHIVE="dist/openbird-${TAG}-macos-arm64.tar.gz"
+          CHECKSUM="dist/openbird-${TAG}-macos-arm64.sha256"
+
+          if gh release view "${TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${TAG}" "$ARCHIVE" "$CHECKSUM" --clobber --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "${TAG}" \
+              "$ARCHIVE" \
+              "$CHECKSUM" \
+              --target "${GITHUB_SHA}" \
+              --title "${TAG}" \
+              --generate-notes \
+              --repo "${GITHUB_REPOSITORY}"
+          fi

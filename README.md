@@ -47,3 +47,17 @@ GitHub Actions runs the package build and test workflow on:
 - pushes to `main`
 - pull requests
 - manual runs from the Actions tab via `workflow_dispatch`
+
+## Releases
+
+GitHub Actions also publishes release artifacts from `.github/workflows/release.yml`.
+
+- push a tag like `v0.1.0`, or
+- run the `Release` workflow manually and provide a tag
+
+Each release uploads:
+
+- `openbird-<tag>-macos-arm64.tar.gz`
+- `openbird-<tag>-macos-arm64.sha256`
+
+The release archive currently contains unsigned SwiftPM release binaries for `OpenbirdApp` and `OpenbirdCollector`.
