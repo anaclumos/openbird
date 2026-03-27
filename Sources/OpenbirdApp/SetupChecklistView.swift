@@ -17,12 +17,25 @@ struct SetupChecklistView: View {
                     title: "Accessibility access",
                     description: "Needed to read the active window tree and build the local activity log.",
                     isComplete: model.accessibilityTrusted
-                )
+                ) {
+                    HStack(spacing: 12) {
+                        Button("Request Accessibility Access") {
+                            model.requestAccessibilityPermission()
+                        }
+                        Button("Open Accessibility Settings") {
+                            model.openAccessibilitySettings()
+                        }
+                    }
+                }
                 permissionRow(
                     title: "BYOK provider",
                     description: "Needed for journal generation and chat. Local and hosted providers are built in.",
                     isComplete: model.activeProvider != nil
-                )
+                ) {
+                    Button("Open Provider Settings") {
+                        model.selection = .settings
+                    }
+                }
             }
             .padding(24)
             .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -34,24 +47,18 @@ struct SetupChecklistView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 12) {
-                Button("Request Accessibility Access") {
-                    model.requestAccessibilityPermission()
-                }
-                Button("Open Accessibility Settings") {
-                    model.openAccessibilitySettings()
-                }
-                Button("Open Provider Settings") {
-                    model.selection = .settings
-                }
-            }
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
-    private func permissionRow(title: String, description: String, isComplete: Bool) -> some View {
+    private func permissionRow<Actions: View>(
+        title: String,
+        description: String,
+        isComplete: Bool,
+        @ViewBuilder actions: () -> Actions
+    ) -> some View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
                 .foregroundStyle(isComplete ? .green : .secondary)
@@ -60,6 +67,8 @@ struct SetupChecklistView: View {
                     .font(.headline)
                 Text(description)
                     .foregroundStyle(.secondary)
+                actions()
+                    .padding(.top, 8)
             }
         }
     }
