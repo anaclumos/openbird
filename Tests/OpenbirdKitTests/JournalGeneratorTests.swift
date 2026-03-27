@@ -48,7 +48,7 @@ struct JournalGeneratorTests {
         )
 
         #expect(journal.sections.count >= 1)
-        #expect(journal.markdown.contains("Review"))
+        #expect(journal.markdown.contains("Summary"))
     }
 
     @Test func prefersSpecificHeadingsAndDeduplicatedBullets() async throws {

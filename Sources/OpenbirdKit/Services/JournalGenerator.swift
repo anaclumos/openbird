@@ -20,9 +20,18 @@ public actor JournalGenerator {
             do {
                 let provider = ProviderFactory.makeProvider(for: providerConfig)
                 let prompt = """
-                You are writing a concise, factual daily activity journal from local computer activity logs.
-                Group the day into readable sections with headings and 1-4 bullets per section.
-                Avoid inventing details. Use only the evidence provided.
+                You are writing a polished daily summary from local computer activity logs.
+                Write for the person who lived the day.
+
+                Requirements:
+                - Return markdown only.
+                - Start with a short 1-2 sentence overview.
+                - Then produce 3-6 titled sections in chronological order.
+                - Each section should have 1-3 concise bullets.
+                - Synthesize the evidence instead of echoing it verbatim.
+                - Prefer meaningful work descriptions over app chrome, repeated browser controls, toolbar labels, or duplicated URLs.
+                - Mention apps, repos, people, channels, or pages only when they help identify the work.
+                - If the evidence is noisy or ambiguous, say so briefly instead of inventing detail.
 
                 Day: \(OpenbirdDateFormatting.weekdayFormatter.string(from: request.date))
 
@@ -122,19 +131,16 @@ public actor JournalGenerator {
 
     private func renderMarkdown(for date: Date, sections: [JournalSection], events: [ActivityEvent]) -> String {
         guard sections.isEmpty == false else {
-            return "# \(OpenbirdDateFormatting.weekdayFormatter.string(from: date)) Review\n\nNo activity captured yet."
+            return "# \(OpenbirdDateFormatting.weekdayFormatter.string(from: date)) Summary\n\nNo activity captured yet."
         }
 
-        var markdown = "# \(OpenbirdDateFormatting.weekdayFormatter.string(from: date)) Review\n\n"
+        let appCount = Set(events.map(\.appName)).count
+        var markdown = "# \(OpenbirdDateFormatting.weekdayFormatter.string(from: date)) Summary\n\n"
+        markdown += "Captured \(sections.count) focus block\(sections.count == 1 ? "" : "s") across \(appCount) app\(appCount == 1 ? "" : "s").\n\n"
         for section in sections {
             markdown += "## \(section.timeRange) — \(section.heading)\n"
             markdown += section.bullets.map { "- \($0)" }.joined(separator: "\n")
             markdown += "\n\n"
-        }
-        let apps = Set(events.map(\.appName)).sorted()
-        if apps.isEmpty == false {
-            markdown += "### Misc\n"
-            markdown += "- Active apps: \(apps.joined(separator: ", "))\n"
         }
         return markdown.trimmingCharacters(in: .whitespacesAndNewlines)
     }

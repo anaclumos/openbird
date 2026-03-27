@@ -74,6 +74,11 @@ final class AppModel: ObservableObject {
         providerConfigs.first { $0.id == settings.activeProviderID && $0.isEnabled }
     }
 
+    func providerName(for id: String?) -> String? {
+        guard let id else { return nil }
+        return providerConfigs.first { $0.id == id }?.name
+    }
+
     var needsOnboarding: Bool {
         accessibilityTrusted == false || activeProvider == nil
     }
