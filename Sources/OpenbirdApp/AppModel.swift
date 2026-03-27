@@ -72,6 +72,24 @@ final class AppModel: ObservableObject {
         permissionsService.isAccessibilityTrusted
     }
 
+    var accessibilityTargetName: String {
+        if isRunningFromAppBundle,
+           let bundleName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String,
+           bundleName.isEmpty == false {
+            return bundleName
+        }
+
+        return ProcessInfo.processInfo.processName
+    }
+
+    var accessibilityManualGrantPath: String? {
+        guard isRunningFromAppBundle == false else {
+            return nil
+        }
+
+        return Bundle.main.executableURL?.path
+    }
+
     var activeProvider: ProviderConfig? {
         providerConfigs.first { $0.id == settings.activeProviderID && $0.isEnabled }
     }
@@ -99,6 +117,10 @@ final class AppModel: ObservableObject {
         default:
             return "Stopped"
         }
+    }
+
+    private var isRunningFromAppBundle: Bool {
+        Bundle.main.bundleURL.pathExtension == "app"
     }
 
     func refresh() async {

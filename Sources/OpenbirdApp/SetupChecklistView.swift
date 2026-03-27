@@ -59,6 +59,13 @@ struct SetupChecklistView: View {
                     .font(.headline)
                 Text(description)
                     .foregroundStyle(.secondary)
+                if let path = model.accessibilityManualGrantPath, isComplete == false {
+                    Text("If you launched from source, macOS may show this as \(model.accessibilityTargetName) instead of Openbird. If it does not appear automatically, use the + button in Accessibility settings and add:")
+                        .foregroundStyle(.secondary)
+                    Text(path)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                }
                 actions()
                     .padding(.top, 8)
             }
