@@ -13,6 +13,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 28) {
                 providerSection
                 captureSection
+                updatesSection
                 exclusionSection
                 deleteSection
             }
@@ -183,6 +184,39 @@ struct SettingsView: View {
                 }
                 .padding(14)
                 .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+    }
+
+    private var updatesSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Updates")
+                .font(.title3.bold())
+
+            LabeledContent("Current version", value: model.appVersion ?? "Development build")
+
+            HStack(spacing: 12) {
+                Button(model.isCheckingForUpdates ? "Checking…" : "Check for updates") {
+                    model.checkForUpdates()
+                }
+                .disabled(model.isCheckingForUpdates || model.appVersion == nil)
+
+                if let update = model.availableUpdate {
+                    Button("Download \(update.version)") {
+                        model.openAvailableUpdate()
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+            }
+
+            if model.appVersion == nil {
+                Text("Update checks are available in packaged Openbird releases.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else if model.updateStatusMessage.isEmpty == false {
+                Text(model.updateStatusMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
     }

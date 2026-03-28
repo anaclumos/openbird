@@ -1,3 +1,4 @@
+import OpenbirdKit
 import SwiftUI
 
 struct RootView: View {
@@ -29,6 +30,17 @@ struct RootView: View {
             .overlay(alignment: .bottomLeading) {
                 CaptureStatusView(model: model)
                     .padding()
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if let update = model.availableUpdate {
+                UpdateBannerView(
+                    update: update,
+                    downloadAction: model.openAvailableUpdate,
+                    dismissAction: model.dismissAvailableUpdate
+                )
+                .padding(.horizontal)
+                .padding(.top, 12)
             }
         }
         .toolbar {
@@ -66,6 +78,33 @@ struct RootView: View {
         } message: {
             Text(model.errorMessage ?? "Unknown error")
         }
+    }
+}
+
+private struct UpdateBannerView: View {
+    let update: AppUpdate
+    let downloadAction: () -> Void
+    let dismissAction: () -> Void
+
+    var body: some View {
+        HStack(spacing: 14) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.title2)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Openbird \(update.version) is available")
+                    .font(.headline)
+                Text("Download the latest signed release from GitHub.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 12)
+            Button("Not now", action: dismissAction)
+            Button("Download", action: downloadAction)
+                .buttonStyle(.borderedProminent)
+        }
+        .padding(14)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 

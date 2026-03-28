@@ -1,8 +1,13 @@
+import AppKit
 import Foundation
 import OpenbirdKit
 
 @MainActor
 final class AppModel: ObservableObject {
+    private static let automaticUpdateCheckInterval: TimeInterval = 60 * 60 * 12
+    private static let dismissedUpdateVersionKey = "openbird.dismissedUpdateVersion"
+    private static let lastUpdateCheckDateKey = "openbird.lastUpdateCheckDate"
+
     enum SidebarItem: String, CaseIterable, Identifiable {
         case today
         case chat
@@ -26,6 +31,7 @@ final class AppModel: ObservableObject {
     @Published var providerConfigs: [ProviderConfig] = []
     @Published var exclusions: [ExclusionRule] = []
     @Published var installedApplications: [InstalledApplication] = []
+    @Published var availableUpdate: AppUpdate?
     @Published var editingProvider = ProviderConfig.defaultOllama
     @Published var selectedDay = Date()
     @Published var todayJournal: DailyJournal?
@@ -33,10 +39,13 @@ final class AppModel: ObservableObject {
     @Published var chatThread: ChatThread?
     @Published var chatMessages: [ChatMessage] = []
     @Published var chatInput = ""
+    @Published var updateStatusMessage = ""
     @Published var providerStatusMessage = ""
+    @Published private(set) var appVersion: String?
     @Published private(set) var availableProviderModels: [ProviderModelInfo] = []
     @Published var errorMessage: String?
     @Published var isBusy = false
+    @Published var isCheckingForUpdates = false
     @Published var isLoadingInstalledApplications = false
     @Published var isShowingRawLogInspector = false
     @Published private(set) var accessibilityTrusted = false
@@ -50,11 +59,22 @@ final class AppModel: ObservableObject {
     private let retentionService: RetentionService
     private let collectorRuntime: CollectorRuntime
     private let collectorOwnerID: String
+    private let updateService: UpdateService
+    private let userDefaults: UserDefaults
     private var providerConnectionTask: Task<Void, Never>?
     private var providerSaveTask: Task<Void, Never>?
+    private var updateCheckTask: Task<Void, Never>?
     private var providerConnectionRequestID = UUID()
+    private var updateCheckRequestID = UUID()
 
-    init() {
+    init(
+        userDefaults: UserDefaults = .standard,
+        updateService: UpdateService = UpdateService()
+    ) {
+        self.userDefaults = userDefaults
+        self.updateService = updateService
+        self.appVersion = Self.currentAppVersion()
+
         do {
             let store = try OpenbirdStore()
             let collectorOwnerID = CollectorRuntime.defaultOwnerID()
@@ -80,11 +100,13 @@ final class AppModel: ObservableObject {
         Task {
             await refresh()
         }
+        checkForUpdatesIfNeeded()
     }
 
     deinit {
         providerConnectionTask?.cancel()
         providerSaveTask?.cancel()
+        updateCheckTask?.cancel()
         collectorRuntime.stop()
     }
 
@@ -219,6 +241,17 @@ final class AppModel: ObservableObject {
         Bundle.main.bundleURL.pathExtension == "app"
     }
 
+    private static func currentAppVersion() -> String? {
+        guard let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+              version.isEmpty == false,
+              version != "0.0.0" else {
+            return nil
+        }
+
+        return version
+    }
+
     func refresh() async {
         refreshAccessibilityPermissionState()
         isBusy = true
@@ -263,6 +296,31 @@ final class AppModel: ObservableObject {
             return
         }
         accessibilityTrusted = isTrusted
+    }
+
+    func checkForUpdates() {
+        runUpdateCheck(force: true, showUpToDateMessage: true)
+    }
+
+    func dismissAvailableUpdate() {
+        guard let availableUpdate else {
+            return
+        }
+
+        userDefaults.set(availableUpdate.version, forKey: Self.dismissedUpdateVersionKey)
+        self.availableUpdate = nil
+        updateStatusMessage = ""
+    }
+
+    func openAvailableUpdate() {
+        guard let availableUpdate else {
+            return
+        }
+
+        userDefaults.set(availableUpdate.version, forKey: Self.dismissedUpdateVersionKey)
+        self.availableUpdate = nil
+        updateStatusMessage = ""
+        NSWorkspace.shared.open(availableUpdate.releaseURL)
     }
 
     func refreshCollectorState() async {
@@ -500,6 +558,99 @@ final class AppModel: ObservableObject {
     private func cancelPendingProviderSave() {
         providerSaveTask?.cancel()
         providerSaveTask = nil
+    }
+
+    private func checkForUpdatesIfNeeded() {
+        guard appVersion != nil else {
+            return
+        }
+
+        if let lastCheckDate = userDefaults.object(forKey: Self.lastUpdateCheckDateKey) as? Date,
+           Date().timeIntervalSince(lastCheckDate) < Self.automaticUpdateCheckInterval {
+            return
+        }
+
+        runUpdateCheck(force: false, showUpToDateMessage: false)
+    }
+
+    private func runUpdateCheck(force: Bool, showUpToDateMessage: Bool) {
+        guard let appVersion else {
+            if showUpToDateMessage {
+                updateStatusMessage = "Update checks are only available in packaged Openbird releases."
+            }
+            return
+        }
+
+        let requestID = UUID()
+        updateCheckRequestID = requestID
+        updateCheckTask?.cancel()
+        updateCheckTask = Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            await self.performUpdateCheck(
+                currentVersion: appVersion,
+                requestID: requestID,
+                force: force,
+                showUpToDateMessage: showUpToDateMessage
+            )
+        }
+    }
+
+    private func performUpdateCheck(
+        currentVersion: String,
+        requestID: UUID,
+        force: Bool,
+        showUpToDateMessage: Bool
+    ) async {
+        guard updateCheckRequestID == requestID else {
+            return
+        }
+
+        isCheckingForUpdates = true
+        if showUpToDateMessage {
+            updateStatusMessage = "Checking for updates…"
+        }
+        userDefaults.set(Date(), forKey: Self.lastUpdateCheckDateKey)
+
+        defer {
+            if updateCheckRequestID == requestID {
+                isCheckingForUpdates = false
+                updateCheckTask = nil
+            }
+        }
+
+        do {
+            let update = try await updateService.latestUpdate(currentVersion: currentVersion)
+            guard Task.isCancelled == false, updateCheckRequestID == requestID else {
+                return
+            }
+
+            if let update {
+                let dismissedVersion = userDefaults.string(forKey: Self.dismissedUpdateVersionKey)
+                if force || dismissedVersion != update.version {
+                    availableUpdate = update
+                    updateStatusMessage = "Openbird \(update.version) is available."
+                } else if showUpToDateMessage {
+                    updateStatusMessage = "Openbird \(update.version) is available."
+                }
+            } else {
+                availableUpdate = nil
+                if showUpToDateMessage {
+                    updateStatusMessage = "Openbird is up to date."
+                }
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard updateCheckRequestID == requestID else {
+                return
+            }
+            if showUpToDateMessage {
+                errorMessage = "Failed to check for updates: \(error.localizedDescription)"
+            }
+        }
     }
 
     func installedApplication(for bundleID: String) -> InstalledApplication? {
