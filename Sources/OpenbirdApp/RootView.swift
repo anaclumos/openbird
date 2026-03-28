@@ -27,10 +27,6 @@ struct RootView: View {
                     SettingsView(model: model)
                 }
             }
-            .overlay(alignment: .bottomLeading) {
-                CaptureStatusView(model: model)
-                    .padding()
-            }
         }
         .safeAreaInset(edge: .top, spacing: 0) {
             if let update = model.availableUpdate {
@@ -45,9 +41,7 @@ struct RootView: View {
         }
         .toolbar {
             ToolbarItem(placement: .automatic) {
-                Button(model.settings.capturePaused ? "Resume Capture" : "Pause Capture") {
-                    model.toggleCapturePaused()
-                }
+                CaptureToolbarButton(model: model)
             }
             ToolbarItem(placement: .automatic) {
                 Button("Refresh") {
@@ -116,8 +110,9 @@ private struct UpdateBannerView: View {
     }
 }
 
-private struct CaptureStatusView: View {
+private struct CaptureToolbarButton: View {
     @ObservedObject var model: AppModel
+    @State private var isHovering = false
 
     private var statusColor: Color {
         if model.settings.capturePaused { return .orange }
@@ -133,22 +128,27 @@ private struct CaptureStatusView: View {
         }
     }
 
-    var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 10, height: 10)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(model.captureStatusLabel)
-                    .font(.headline)
-                Text(model.captureStatusDetail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
+    private var buttonTitle: String {
+        if isHovering {
+            return model.settings.capturePaused ? "Resume Capture" : "Pause Capture"
         }
-        .padding(14)
-        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .frame(maxWidth: 320)
+        return model.captureStatusLabel
+    }
+
+    var body: some View {
+        Button {
+            model.toggleCapturePaused()
+        } label: {
+            HStack(spacing: 8) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 8, height: 8)
+                Text(buttonTitle)
+            }
+        }
+        .help("\(model.captureStatusLabel)\n\(model.captureStatusDetail)")
+        .onHover { hovering in
+            isHovering = hovering
+        }
     }
 }
