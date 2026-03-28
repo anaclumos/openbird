@@ -46,9 +46,7 @@ struct TodayView: View {
                 focusedField: $focusedField
             )
             .padding(.horizontal, 28)
-            .padding(.top, 12)
             .padding(.bottom, 24)
-            .background(Color(nsColor: .windowBackgroundColor))
         }
         .onAppear {
             handleChatFocusRequestIfNeeded()

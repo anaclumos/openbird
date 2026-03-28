@@ -15,37 +15,9 @@ struct TodayChatDock: View {
     private let transcriptHeight: CGFloat = 300
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: 12) {
             if isExpanded {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
-                            if model.chatMessages.isEmpty {
-                                EmptyChatState()
-                                    .frame(maxWidth: .infinity, minHeight: transcriptHeight, alignment: .leading)
-                            } else {
-                                ForEach(model.chatMessages) { message in
-                                    ChatMessageRow(message: message)
-                                }
-                            }
-
-                            Color.clear
-                                .frame(height: 1)
-                                .id(bottomAnchor)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 24)
-                        .padding(.top, 24)
-                        .padding(.bottom, 20)
-                    }
-                    .frame(height: transcriptHeight)
-                    .onAppear {
-                        scrollToBottom(using: proxy, animated: false)
-                    }
-                    .onChange(of: model.chatMessages.last?.id) { _, _ in
-                        scrollToBottom(using: proxy)
-                    }
-                }
+                transcript
             }
 
             ChatComposer(
@@ -54,17 +26,47 @@ struct TodayChatDock: View {
                 expand: expandChat,
                 send: sendChat
             )
-            .padding(24)
         }
         .frame(maxWidth: contentWidth)
         .frame(maxWidth: .infinity)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 28, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08))
-        }
-        .shadow(color: Color.black.opacity(0.08), radius: 18, y: 6)
         .animation(.spring(response: 0.24, dampingFraction: 0.9), value: isExpanded)
+    }
+
+    private var transcript: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    if model.chatMessages.isEmpty {
+                        EmptyChatState()
+                            .frame(maxWidth: .infinity, minHeight: transcriptHeight, alignment: .leading)
+                    } else {
+                        ForEach(model.chatMessages) { message in
+                            ChatMessageRow(message: message)
+                        }
+                    }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id(bottomAnchor)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 24)
+                .padding(.top, 24)
+                .padding(.bottom, 20)
+            }
+            .frame(height: transcriptHeight)
+            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(0.08))
+            }
+            .onAppear {
+                scrollToBottom(using: proxy, animated: false)
+            }
+            .onChange(of: model.chatMessages.last?.id) { _, _ in
+                scrollToBottom(using: proxy)
+            }
+        }
     }
 
     private func expandChat() {
