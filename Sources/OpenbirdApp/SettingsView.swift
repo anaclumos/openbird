@@ -195,18 +195,11 @@ struct SettingsView: View {
 
             LabeledContent("Current version", value: model.appVersion ?? "Development build")
 
-            HStack(spacing: 12) {
-                Button(model.isCheckingForUpdates ? "Checking…" : "Check for updates") {
-                    model.checkForUpdates()
+            if let update = model.availableUpdate {
+                Button("Download \(update.version)") {
+                    model.openAvailableUpdate()
                 }
-                .disabled(model.isCheckingForUpdates || model.appVersion == nil)
-
-                if let update = model.availableUpdate {
-                    Button("Download \(update.version)") {
-                        model.openAvailableUpdate()
-                    }
-                    .buttonStyle(.borderedProminent)
-                }
+                .buttonStyle(.borderedProminent)
             }
 
             if model.appVersion == nil {

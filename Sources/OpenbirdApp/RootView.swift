@@ -54,6 +54,14 @@ struct RootView: View {
                     Task { await model.refresh() }
                 }
             }
+            if model.selection == .settings {
+                ToolbarItem(placement: .automatic) {
+                    Button(model.isCheckingForUpdates ? "Checking…" : "Check for Updates") {
+                        model.checkForUpdates()
+                    }
+                    .disabled(model.isCheckingForUpdates || model.appVersion == nil)
+                }
+            }
         }
         .sheet(isPresented: $model.isShowingRawLogInspector) {
             RawLogInspectorView(model: model)
