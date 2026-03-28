@@ -1,9 +1,11 @@
+import AppKit
 import OpenbirdKit
 import SwiftUI
 
 struct RootView: View {
     @ObservedObject var model: AppModel
     private let captureStatusTimer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    @State private var dismissedGoogleDocsHintEventID: String?
 
     var body: some View {
         NavigationSplitView {
@@ -41,6 +43,18 @@ struct RootView: View {
         .sheet(isPresented: $model.isShowingRawLogInspector) {
             RawLogInspectorView(model: model)
         }
+        .overlay(alignment: .top) {
+            if let hint = visibleGoogleDocsCaptureHint {
+                GoogleDocsCaptureNotification(
+                    hint: hint,
+                    dismiss: {
+                        dismissedGoogleDocsHintEventID = hint.eventID
+                    }
+                )
+                .padding(.top, 18)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
         .onAppear {
             Task { await model.refreshCollectorState() }
         }
@@ -61,6 +75,17 @@ struct RootView: View {
         } message: {
             Text(model.errorMessage ?? "Unknown error")
         }
+        .animation(.spring(response: 0.28, dampingFraction: 0.9), value: visibleGoogleDocsCaptureHint?.eventID)
+    }
+
+    private var visibleGoogleDocsCaptureHint: GoogleDocsCaptureHint? {
+        guard let hint = model.googleDocsCaptureHint else {
+            return nil
+        }
+        guard dismissedGoogleDocsHintEventID != hint.eventID else {
+            return nil
+        }
+        return hint
     }
 }
 
@@ -140,5 +165,48 @@ private struct UpdateToolbarButton: View {
         }
         .disabled(model.isInstallingUpdate || model.isCheckingForUpdates || (model.availableUpdate == nil && model.appVersion == nil))
         .help(helpText)
+    }
+}
+
+private struct GoogleDocsCaptureNotification: View {
+    let hint: GoogleDocsCaptureHint
+    let dismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(nsImage: NSApp.applicationIconImage)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 44, height: 44)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Openbird needs a Google Docs setting")
+                    .font(.headline)
+                Text("Turn on screen reader support so Openbird can read this Google Doc.")
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 10) {
+                    Text(hint.shortcut)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                    Link("Show me how", destination: hint.helpURL)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(18)
+        .frame(width: 440, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: Color.black.opacity(0.12), radius: 18, y: 8)
     }
 }

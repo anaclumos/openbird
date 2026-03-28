@@ -236,6 +236,14 @@ final class AppModel: ObservableObject {
         ProviderConnectionAdvisor.visibleChatModels(from: availableProviderModels, for: editingProvider.kind)
     }
 
+    var googleDocsCaptureHint: GoogleDocsCaptureHint? {
+        guard Calendar.current.isDateInToday(selectedDay) else {
+            return nil
+        }
+
+        return GoogleDocsCaptureAdvisor.hint(for: rawEvents)
+    }
+
     private var isRunningFromAppBundle: Bool {
         Bundle.main.bundleURL.pathExtension == "app"
     }
