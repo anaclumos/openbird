@@ -31,6 +31,8 @@ struct SnapshotSanitizer {
         switch bundleId {
         case "com.tinyspeck.slackmacgap":
             return normalizedSlackTitle(trimmed)
+        case "com.kakao.KakaoTalkMac":
+            return normalizedKakaoTalkTitle(trimmed)
         default:
             return trimmed
         }
@@ -98,6 +100,17 @@ struct SnapshotSanitizer {
             || normalized.contains("thread")
     }
 
+    private func normalizedKakaoTalkTitle(_ title: String) -> String {
+        let normalized = title.normalizedComparisonKey
+        if normalized.isEmpty {
+            return ""
+        }
+        if normalized.allSatisfy({ $0.isNumber || $0 == " " }) {
+            return ""
+        }
+        return title
+    }
+
     private func isGenericTitle(_ title: String, appName: String) -> Bool {
         title.isEmpty || title.normalizedComparisonKey == appName.normalizedComparisonKey
     }
@@ -142,11 +155,39 @@ struct SnapshotSanitizer {
             }
         }
 
+        if bundleId == "com.kakao.KakaoTalkMac" {
+            if kakaoTalkChromeLines.contains(normalized) {
+                return true
+            }
+            if normalized.contains("new message") || normalized.contains("new messages") {
+                return true
+            }
+            if normalized.contains("chatrooms") {
+                return true
+            }
+            if normalized.allSatisfy({ $0.isNumber || $0 == " " }) {
+                return true
+            }
+            if isTimeLikeLine(normalized) {
+                return true
+            }
+        }
+
         if bundleId == "com.tinyspeck.slackmacgap" && normalized == "slack" {
             return true
         }
 
         return false
+    }
+
+    private func isTimeLikeLine(_ normalized: String) -> Bool {
+        let words = normalized.split(separator: " ")
+        guard words.isEmpty == false else { return true }
+
+        let dateTokens = Set(["am", "pm", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"])
+        return words.allSatisfy { word in
+            word.allSatisfy(\.isNumber) || dateTokens.contains(String(word))
+        }
     }
 }
 
@@ -175,4 +216,24 @@ private let messageChromeLines: Set<String> = [
     "messages",
     "search",
     "start facetime",
+]
+
+private let kakaoTalkChromeLines: Set<String> = [
+    "add chatroom",
+    "all folder",
+    "button",
+    "chatlist icon notioff",
+    "chatroom folder",
+    "chats",
+    "common icon newdot",
+    "common icon triangledown",
+    "emoticon",
+    "enter a message",
+    "kakaotalk",
+    "notifications",
+    "profile",
+    "search",
+    "settings",
+    "silent chatroom",
+    "unread folder",
 ]

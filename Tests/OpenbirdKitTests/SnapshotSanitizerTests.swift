@@ -102,6 +102,83 @@ struct SnapshotSanitizerTests {
         #expect(sanitized.visibleText == "Can you review this before 5?\nYep, I'll take a look.")
     }
 
+    @Test func filtersKakaoTalkChromeAndKeepsMessageText() {
+        let sanitizer = SnapshotSanitizer()
+        let snapshot = WindowSnapshot(
+            bundleId: "com.kakao.KakaoTalkMac",
+            appName: "KakaoTalk",
+            windowTitle: "Yoo✨",
+            url: nil,
+            visibleText: """
+            Yoo✨
+            Profile
+            6:29 PM
+            오 저도 사나 좋아하는데...
+            Enter a message
+            """,
+            source: "accessibility"
+        )
+
+        let sanitized = sanitizer.sanitize(snapshot)
+
+        #expect(sanitized.windowTitle == "Yoo✨")
+        #expect(sanitized.visibleText == "오 저도 사나 좋아하는데...")
+    }
+
+    @Test func fallsBackToKakaoTalkConversationWhenTitleIsGeneric() {
+        let sanitizer = SnapshotSanitizer()
+        let snapshot = WindowSnapshot(
+            bundleId: "com.kakao.KakaoTalkMac",
+            appName: "KakaoTalk",
+            windowTitle: "KakaoTalk",
+            url: nil,
+            visibleText: """
+            KakaoTalk
+            common icon newdot
+            Notifications
+            Settings
+            Chats
+            Add chatroom
+            Search
+            Profile
+            8:59 PM
+            박륜지
+            내가 강한 사람이라서 스스로 처리한거지^
+            """,
+            source: "accessibility"
+        )
+
+        let sanitized = sanitizer.sanitize(snapshot)
+
+        #expect(sanitized.windowTitle == "박륜지")
+        #expect(sanitized.visibleText == "내가 강한 사람이라서 스스로 처리한거지^")
+    }
+
+    @Test func fallsBackToKakaoTalkConversationWhenTitleIsNumeric() {
+        let sanitizer = SnapshotSanitizer()
+        let snapshot = WindowSnapshot(
+            bundleId: "com.kakao.KakaoTalkMac",
+            appName: "KakaoTalk",
+            windowTitle: "1",
+            url: nil,
+            visibleText: """
+            Chats
+            Silent Chatroom
+            박륜지
+            Unread folder, 1 New message
+            8:30 PM
+            ㅋㅋㅋㅋ 먼지가 없긴 해요
+            Enter a message
+            """,
+            source: "accessibility"
+        )
+
+        let sanitized = sanitizer.sanitize(snapshot)
+
+        #expect(sanitized.windowTitle == "박륜지")
+        #expect(sanitized.visibleText == "ㅋㅋㅋㅋ 먼지가 없긴 해요")
+    }
+
     @Test func fallsBackToMeaningfulVisibleTextWhenWindowTitleIsMissing() {
         let sanitizer = SnapshotSanitizer()
         let snapshot = WindowSnapshot(
