@@ -40,10 +40,9 @@ struct SettingsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
                 providerSection
-                captureSection
                 updatesSection
                 exclusionSection
-                deleteSection
+                dataSection
             }
             .padding(28)
         }
@@ -137,21 +136,6 @@ struct SettingsView: View {
             return .failure
         }
         return .neutral
-    }
-
-    private var captureSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Capture")
-                .font(.title3.bold())
-            Toggle("Pause capture", isOn: Binding(
-                get: { model.settings.capturePaused },
-                set: { _ in model.toggleCapturePaused() }
-            ))
-            Stepper("Retention days: \(model.settings.retentionDays)", value: Binding(
-                get: { model.settings.retentionDays },
-                set: { model.updateRetentionDays($0) }
-            ), in: 1...90)
-        }
     }
 
     private var exclusionSection: some View {
@@ -288,10 +272,16 @@ struct SettingsView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 
-    private var deleteSection: some View {
+    private var dataSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Delete data")
+            Text("Data")
                 .font(.title3.bold())
+
+            Stepper("Retention days: \(model.settings.retentionDays)", value: Binding(
+                get: { model.settings.retentionDays },
+                set: { model.updateRetentionDays($0) }
+            ), in: 1...90)
+
             ControlGroup {
                 Button("Last hour") { model.deleteData(scope: .lastHour) }
                 Button("Last day") { model.deleteData(scope: .lastDay) }
