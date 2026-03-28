@@ -178,29 +178,30 @@ public struct AccessibilitySnapshotter: Sendable {
     }
 
     private func prioritizedChildren(for element: AXUIElement) -> [AXUIElement] {
-        copyChildren(for: element).sorted { lhs, rhs in
-            let lhsRole = stringAttribute(kAXRoleAttribute, on: lhs) ?? ""
-            let rhsRole = stringAttribute(kAXRoleAttribute, on: rhs) ?? ""
-            let lhsPriority = childPriority(for: lhsRole)
-            let rhsPriority = childPriority(for: rhsRole)
-            if lhsPriority != rhsPriority {
-                return lhsPriority > rhsPriority
+        copyChildren(for: element)
+            .map { child in
+                let role = stringAttribute(kAXRoleAttribute, on: child) ?? ""
+                return PrioritizedChild(
+                    element: child,
+                    role: role,
+                    priority: childPriority(for: role),
+                    area: elementArea(for: child),
+                    originX: elementOriginX(for: child)
+                )
             }
-
-            let lhsArea = elementArea(for: lhs)
-            let rhsArea = elementArea(for: rhs)
-            if lhsArea != rhsArea {
-                return lhsArea > rhsArea
+            .sorted { lhs, rhs in
+                if lhs.priority != rhs.priority {
+                    return lhs.priority > rhs.priority
+                }
+                if lhs.area != rhs.area {
+                    return lhs.area > rhs.area
+                }
+                if lhs.originX != rhs.originX {
+                    return lhs.originX > rhs.originX
+                }
+                return lhs.role < rhs.role
             }
-
-            let lhsX = elementOriginX(for: lhs)
-            let rhsX = elementOriginX(for: rhs)
-            if lhsX != rhsX {
-                return lhsX > rhsX
-            }
-
-            return lhsRole < rhsRole
-        }
+            .map(\.element)
     }
 
     private func stringAttribute(_ attribute: String, on element: AXUIElement) -> String? {
@@ -294,6 +295,14 @@ public struct AccessibilitySnapshotter: Sendable {
         }
         return size
     }
+}
+
+private struct PrioritizedChild {
+    let element: AXUIElement
+    let role: String
+    let priority: Int
+    let area: CGFloat
+    let originX: CGFloat
 }
 
 private extension Array where Element: Hashable {

@@ -8,6 +8,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
     private let snapshotter = AccessibilitySnapshotter()
     private let browserURLResolver = BrowserURLResolver()
     private let exclusionEngine = ExclusionEngine()
+    private let captureGate = CaptureGate()
     private let captureInterval: TimeInterval
     private let ownerID: String
     private let ownerName: String
@@ -73,6 +74,12 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
     }
 
     public func captureNow() async {
+        await captureGate.runIfIdle {
+            await performCaptureNow()
+        }
+    }
+
+    private func performCaptureNow() async {
         do {
             let now = Date()
             let claimedLease = try await store.claimCollectorLease(
@@ -132,5 +139,16 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
                 _ = try? await store.updateCollectorStatus(ownerID: ownerID, status: "error", heartbeat: Date())
             }
         }
+    }
+}
+
+actor CaptureGate {
+    private var isRunning = false
+
+    func runIfIdle(_ operation: @Sendable () async -> Void) async {
+        guard isRunning == false else { return }
+        isRunning = true
+        defer { isRunning = false }
+        await operation()
     }
 }
