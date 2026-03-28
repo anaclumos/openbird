@@ -39,6 +39,16 @@ struct TodayView: View {
         .padding(28)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .background(Color(nsColor: .windowBackgroundColor))
+        .overlay {
+            if isChatExpanded {
+                Rectangle()
+                    .fill(Color.black.opacity(0.001))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        collapseChat()
+                    }
+            }
+        }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             TodayChatDock(
                 model: model,
