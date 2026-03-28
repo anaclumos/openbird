@@ -93,25 +93,38 @@ final class AppModel: ObservableObject {
         return ProcessInfo.processInfo.processName
     }
 
-    var accessibilityManualGrantPath: String? {
-        guard isRunningFromAppBundle == false else {
-            return nil
+    var accessibilityGrantPath: String? {
+        if isRunningFromAppBundle {
+            return Bundle.main.bundleURL.path
         }
 
         return Bundle.main.executableURL?.path
     }
 
-    var accessibilityManualGrantHelp: String? {
-        guard accessibilityManualGrantPath != nil else {
+    var accessibilityBundleIdentifier: String? {
+        Bundle.main.bundleIdentifier
+    }
+
+    var accessibilityGrantHelp: String? {
+        guard accessibilityGrantPath != nil else {
             return nil
+        }
+
+        if isRunningFromAppBundle {
+            let bundlePath = Bundle.main.bundleURL.path
+            if bundlePath.contains("/.build/") || bundlePath.contains("/DerivedData/") {
+                return "This copy is running from a local development app bundle. macOS grants Accessibility per app copy, so if you already enabled another Openbird build, add this one too. If it still looks disabled after enabling it, quit and reopen Openbird."
+            }
+
+            return "macOS grants Accessibility per app copy. If you already enabled another Openbird build, make sure it is this one. If it still looks disabled after enabling it, quit and reopen Openbird."
         }
 
         if let executablePath = Bundle.main.executableURL?.path,
            executablePath.contains("/DerivedData/") {
-            return "This copy is running from Xcode, not from a packaged Openbird.app. macOS may list it as \(accessibilityTargetName). If it does not appear automatically, use the + button in Accessibility settings and add:"
+            return "This copy is running from Xcode, not from a packaged Openbird.app. macOS may list it as \(accessibilityTargetName). If it does not appear automatically, use the + button in Accessibility settings and add this exact executable. If it still looks disabled after enabling it, quit and reopen Openbird."
         }
 
-        return "This copy is running directly from a built executable, not from a packaged Openbird.app. macOS may list it as \(accessibilityTargetName). If it does not appear automatically, use the + button in Accessibility settings and add:"
+        return "This copy is running directly from a built executable, not from a packaged Openbird.app. macOS may list it as \(accessibilityTargetName). If it does not appear automatically, use the + button in Accessibility settings and add this exact executable. If it still looks disabled after enabling it, quit and reopen Openbird."
     }
 
     var activeProvider: ProviderConfig? {

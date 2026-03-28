@@ -35,15 +35,22 @@ struct SetupChecklistView: View {
                             }
                         }
                     }
-                    if let help = model.accessibilityManualGrantHelp,
-                       let path = model.accessibilityManualGrantPath,
+                    if let help = model.accessibilityGrantHelp,
                        model.accessibilityTrusted == false {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(help)
                                 .foregroundStyle(.secondary)
-                            Text(path)
-                                .font(.system(.caption, design: .monospaced))
-                                .textSelection(.enabled)
+                            if let path = model.accessibilityGrantPath {
+                                Text("App: \(path)")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .textSelection(.enabled)
+                            }
+                            if let bundleIdentifier = model.accessibilityBundleIdentifier {
+                                Text("Bundle ID: \(bundleIdentifier)")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
                         }
                         .padding(.leading, 36)
                     }
