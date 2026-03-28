@@ -63,24 +63,6 @@ struct SettingsView: View {
             } else if model.editingProvider.chatModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
                 LabeledContent("Chat model", value: model.editingProvider.chatModel)
             }
-            if model.editingProvider.kind.supportsEmbeddings {
-                if model.availableEmbeddingModels.isEmpty == false {
-                    Picker("Embedding model", selection: modelSelection(
-                        text: $model.editingProvider.embeddingModel,
-                        models: model.availableEmbeddingModels,
-                        allowsEmptySelection: true
-                    )) {
-                        Text("None").tag("")
-                        ForEach(model.availableEmbeddingModels) { providerModel in
-                            Text(providerModel.displayName).tag(providerModel.id)
-                        }
-                    }
-                    .frame(maxWidth: 360)
-                } else if model.editingProvider.embeddingModel.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
-                    LabeledContent("Embedding model", value: model.editingProvider.embeddingModel)
-                }
-            }
-
             if model.providerStatusMessage.isEmpty == false {
                 Text(model.providerStatusMessage)
                     .font(.caption)

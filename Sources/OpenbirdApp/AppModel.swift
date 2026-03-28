@@ -229,12 +229,7 @@ final class AppModel: ObservableObject {
     }
 
     var availableChatModels: [ProviderModelInfo] {
-        let models = availableProviderModels.filter { ProviderConnectionAdvisor.isEmbeddingModel($0.id) == false }
-        return models.isEmpty ? availableProviderModels : models
-    }
-
-    var availableEmbeddingModels: [ProviderModelInfo] {
-        availableProviderModels.filter { ProviderConnectionAdvisor.isEmbeddingModel($0.id) }
+        ProviderConnectionAdvisor.visibleChatModels(from: availableProviderModels)
     }
 
     private var isRunningFromAppBundle: Bool {
@@ -479,7 +474,9 @@ final class AppModel: ObservableObject {
             availableProviderModels = models
 
             var updated = sanitizedProviderConfig(editingProvider)
-            if ProviderConnectionAdvisor.shouldReplaceChatModel(updated.chatModel),
+            let chatModels = ProviderConnectionAdvisor.visibleChatModels(from: models)
+            let isSelectedChatModelVisible = chatModels.contains { $0.id == updated.chatModel }
+            if (ProviderConnectionAdvisor.shouldReplaceChatModel(updated.chatModel) || isSelectedChatModelVisible == false),
                let suggestedChatModel = ProviderConnectionAdvisor.suggestedChatModel(from: models) {
                 updated.chatModel = suggestedChatModel
             }
@@ -492,12 +489,12 @@ final class AppModel: ObservableObject {
             if canPersistProvider(updated, availableModels: models) {
                 await persistProvider(
                     updated,
-                    statusMessage: connectionSuccessMessage(modelCount: models.count, saved: true)
+                    statusMessage: connectionSuccessMessage(models: models, saved: true)
                 )
             } else if models.isEmpty {
                 providerStatusMessage = "Connection successful, but no chat models were detected."
             } else {
-                providerStatusMessage = connectionSuccessMessage(modelCount: models.count, saved: false)
+                providerStatusMessage = connectionSuccessMessage(models: models, saved: false)
             }
         } catch is CancellationError {
             return
@@ -517,7 +514,7 @@ final class AppModel: ObservableObject {
             return false
         }
 
-        let chatModels = availableModels.filter { ProviderConnectionAdvisor.isEmbeddingModel($0.id) == false }
+        let chatModels = ProviderConnectionAdvisor.visibleChatModels(from: availableModels)
         if chatModels.isEmpty == false {
             return chatModels.contains { $0.id == chatModel }
         }
@@ -525,7 +522,8 @@ final class AppModel: ObservableObject {
         return ProviderConnectionAdvisor.shouldReplaceChatModel(chatModel) == false
     }
 
-    private func connectionSuccessMessage(modelCount: Int, saved: Bool) -> String {
+    private func connectionSuccessMessage(models: [ProviderModelInfo], saved: Bool) -> String {
+        let modelCount = ProviderConnectionAdvisor.visibleChatModels(from: models).count
         let baseMessage: String
         if modelCount == 0 {
             baseMessage = "Connection successful."
