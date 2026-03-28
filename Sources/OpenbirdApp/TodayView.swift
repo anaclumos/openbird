@@ -167,62 +167,17 @@ struct TodayView: View {
     @MainActor
     private func prepareTimeline() async {
         let journalSections = model.todayJournal?.sections ?? []
-        let rawEvents = model.rawEvents.filter { ActivityEvidencePreprocessor.isMeaningful($0) }
-        let groupedRawEvents = ActivityEvidencePreprocessor.groupedMeaningfulEvents(from: model.rawEvents)
+        let rawEvents = model.rawEvents
         let installedApplications = model.installedApplications
 
         isPreparingTimeline = true
 
         let preparationTask = Task.detached(priority: .userInitiated) {
-            let applicationsByBundleID = Dictionary(uniqueKeysWithValues: installedApplications.map {
-                ($0.bundleID.lowercased(), $0)
-            })
-
-            if journalSections.isEmpty == false {
-                let eventsByID = Dictionary(uniqueKeysWithValues: rawEvents.map { ($0.id, $0) })
-
-                return journalSections.map { section in
-                    let representativeEvent = section.sourceEventIDs.lazy.compactMap { eventsByID[$0] }.first
-                    let bundlePath = representativeEvent.flatMap { event in
-                        applicationsByBundleID[event.bundleId.lowercased()]?.bundlePath
-                    }
-
-                    return TimelineItem(
-                        id: section.id,
-                        timeRange: section.timeRange,
-                        title: section.heading,
-                        bullets: section.bullets,
-                        bundleId: representativeEvent?.bundleId,
-                        bundlePath: bundlePath,
-                        appName: representativeEvent?.appName ?? section.heading
-                    )
-                }
-            }
-
-            return groupedRawEvents
-                .filter { $0.isExcluded == false }
-                .map { event in
-                    let bundlePath = applicationsByBundleID[event.bundleId.lowercased()]?.bundlePath
-                    let bulletCandidates: [String] = [
-                        ActivityEvidencePreprocessor.summarizedURL(from: event.url),
-                        event.excerpt.isEmpty ? nil : event.excerpt,
-                        event.sourceEventCount > 1 ? "\(event.sourceEventCount) grouped logs" : nil,
-                    ].compactMap { value in
-                        guard let value else { return nil }
-                        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-                        return trimmed.isEmpty ? nil : trimmed
-                    }
-
-                    return TimelineItem(
-                        id: event.id,
-                        timeRange: "\(OpenbirdDateFormatting.timeString(for: event.startedAt)) - \(OpenbirdDateFormatting.timeString(for: event.endedAt))",
-                        title: event.displayTitle,
-                        bullets: bulletCandidates,
-                        bundleId: event.bundleId,
-                        bundlePath: bundlePath,
-                        appName: event.appName
-                    )
-                }
+            Self.buildTimelineItems(
+                journalSections: journalSections,
+                rawEvents: rawEvents,
+                installedApplications: installedApplications
+            )
         }
         let items = await preparationTask.value
 
@@ -232,6 +187,64 @@ struct TodayView: View {
 
         timelineItems = items
         isPreparingTimeline = false
+    }
+
+    nonisolated private static func buildTimelineItems(
+        journalSections: [JournalSection],
+        rawEvents: [ActivityEvent],
+        installedApplications: [InstalledApplication]
+    ) -> [TimelineItem] {
+        let meaningfulRawEvents = rawEvents.filter { ActivityEvidencePreprocessor.isMeaningful($0) }
+        let groupedRawEvents = ActivityEvidencePreprocessor.groupedMeaningfulEvents(from: rawEvents)
+        let applicationsByBundleID = Dictionary(uniqueKeysWithValues: installedApplications.map {
+            ($0.bundleID.lowercased(), $0)
+        })
+
+        if journalSections.isEmpty == false {
+            let eventsByID = Dictionary(uniqueKeysWithValues: meaningfulRawEvents.map { ($0.id, $0) })
+
+            return journalSections.map { section in
+                let representativeEvent = section.sourceEventIDs.lazy.compactMap { eventsByID[$0] }.first
+                let bundlePath = representativeEvent.flatMap { event in
+                    applicationsByBundleID[event.bundleId.lowercased()]?.bundlePath
+                }
+
+                return TimelineItem(
+                    id: section.id,
+                    timeRange: section.timeRange,
+                    title: section.heading,
+                    bullets: section.bullets,
+                    bundleId: representativeEvent?.bundleId,
+                    bundlePath: bundlePath,
+                    appName: representativeEvent?.appName ?? section.heading
+                )
+            }
+        }
+
+        return groupedRawEvents
+            .filter { $0.isExcluded == false }
+            .map { event in
+                let bundlePath = applicationsByBundleID[event.bundleId.lowercased()]?.bundlePath
+                let bulletCandidates: [String] = [
+                    ActivityEvidencePreprocessor.summarizedURL(from: event.url),
+                    event.excerpt.isEmpty ? nil : event.excerpt,
+                    event.sourceEventCount > 1 ? "\(event.sourceEventCount) grouped logs" : nil,
+                ].compactMap { value in
+                    guard let value else { return nil }
+                    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+                    return trimmed.isEmpty ? nil : trimmed
+                }
+
+                return TimelineItem(
+                    id: event.id,
+                    timeRange: "\(OpenbirdDateFormatting.timeString(for: event.startedAt)) - \(OpenbirdDateFormatting.timeString(for: event.endedAt))",
+                    title: event.displayTitle,
+                    bullets: bulletCandidates,
+                    bundleId: event.bundleId,
+                    bundlePath: bundlePath,
+                    appName: event.appName
+                )
+            }
     }
 }
 
