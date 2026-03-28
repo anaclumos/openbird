@@ -200,4 +200,40 @@ struct SnapshotSanitizerTests {
         #expect(sanitized.windowTitle == "Project notes")
         #expect(sanitized.visibleText == "Ship activity tracking fix")
     }
+
+    @Test func discardsLoginWindowSnapshots() {
+        let sanitizer = SnapshotSanitizer()
+        let snapshot = WindowSnapshot(
+            bundleId: "com.apple.loginwindow",
+            appName: "loginwindow",
+            windowTitle: "loginwindow",
+            url: nil,
+            visibleText: "",
+            source: "accessibility"
+        )
+
+        #expect(sanitizer.shouldDiscard(snapshot))
+    }
+
+    @Test func filtersBrowserChromeFragmentsAndKeepsMeaningfulContent() {
+        let sanitizer = SnapshotSanitizer()
+        let snapshot = WindowSnapshot(
+            bundleId: "com.apple.Safari",
+            appName: "Safari",
+            windowTitle: "ComputelessComputer/openbird",
+            url: "https://github.com/ComputelessComputer/openbird",
+            visibleText: """
+            ComputelessComputer/openbird
+            Tab bar, 2 tabs, 7 pinned tabs Go back Go forward Page Menu Add page to Reading List
+            PR fixes calendar sync behavior
+            https://github.com/ComputelessComputer/openbird
+            """,
+            source: "accessibility"
+        )
+
+        let sanitized = sanitizer.sanitize(snapshot)
+
+        #expect(sanitized.windowTitle == "ComputelessComputer/openbird")
+        #expect(sanitized.visibleText == "PR fixes calendar sync behavior\nhttps://github.com/ComputelessComputer/openbird")
+    }
 }

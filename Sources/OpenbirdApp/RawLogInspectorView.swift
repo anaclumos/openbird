@@ -7,7 +7,7 @@ struct RawLogInspectorView: View {
 
     var body: some View {
         NavigationStack {
-            List(model.rawEvents) { event in
+            List(filteredEvents) { event in
                 HStack(alignment: .top, spacing: 12) {
                     ActivityAppIcon(bundleId: event.bundleId, appName: event.appName)
                         .padding(.top, 2)
@@ -53,5 +53,19 @@ struct RawLogInspectorView: View {
             }
         }
         .frame(minWidth: 900, minHeight: 540)
+    }
+
+    private var filteredEvents: [ActivityEvent] {
+        model.rawEvents.filter { event in
+            if event.bundleId == "com.apple.loginwindow" || event.appName.lowercased() == "loginwindow" {
+                return false
+            }
+
+            let hasUsefulText = event.visibleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+            let hasUsefulURL = (event.url?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+            let hasSpecificTitle = (event.detailTitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+
+            return hasUsefulText || hasUsefulURL || hasSpecificTitle
+        }
     }
 }

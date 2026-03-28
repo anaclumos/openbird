@@ -119,7 +119,7 @@ struct TodayView: View {
     @MainActor
     private func prepareTimeline() async {
         let journalSections = model.todayJournal?.sections ?? []
-        let rawEvents = model.rawEvents
+        let rawEvents = model.rawEvents.filter(isRelevantTimelineEvent)
         let installedApplications = model.installedApplications
 
         isPreparingTimeline = true
@@ -183,6 +183,18 @@ struct TodayView: View {
 
         timelineItems = items
         isPreparingTimeline = false
+    }
+
+    private func isRelevantTimelineEvent(_ event: ActivityEvent) -> Bool {
+        if event.bundleId == "com.apple.loginwindow" || event.appName.lowercased() == "loginwindow" {
+            return false
+        }
+
+        let hasUsefulText = event.visibleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        let hasUsefulURL = (event.url?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+        let hasSpecificTitle = (event.detailTitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+
+        return hasUsefulText || hasUsefulURL || hasSpecificTitle
     }
 }
 

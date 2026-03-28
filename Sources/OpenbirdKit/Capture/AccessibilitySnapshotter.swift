@@ -20,7 +20,8 @@ public struct AccessibilitySnapshotter {
         guard let focusedWindow = copyElementAttribute(axApplication, attribute: kAXFocusedWindowAttribute)
                 ?? copyElementAttribute(axApplication, attribute: kAXMainWindowAttribute)
         else {
-            return snapshotSanitizer.sanitize(minimalSnapshot(for: application, bundleID: bundleID))
+            let snapshot = snapshotSanitizer.sanitize(minimalSnapshot(for: application, bundleID: bundleID))
+            return snapshotSanitizer.shouldDiscard(snapshot) ? nil : snapshot
         }
 
         if boolAttribute(kAXMinimizedAttribute, on: focusedWindow) == true {
@@ -46,7 +47,8 @@ public struct AccessibilitySnapshotter {
             visibleText: visibleText.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines),
             source: "accessibility"
         )
-        return snapshotSanitizer.sanitize(snapshot)
+        let sanitized = snapshotSanitizer.sanitize(snapshot)
+        return snapshotSanitizer.shouldDiscard(sanitized) ? nil : sanitized
     }
 
     private func minimalSnapshot(for application: NSRunningApplication, bundleID: String) -> WindowSnapshot {

@@ -9,7 +9,7 @@ public actor JournalGenerator {
 
     public func generate(request: JournalGenerationRequest) async throws -> DailyJournal {
         let dayRange = Calendar.current.dayRange(for: request.date)
-        let events = try await store.loadActivityEvents(in: dayRange)
+        let events = try await store.loadActivityEvents(in: dayRange).filter(isMeaningfulEvent)
         let trimmedEvents = Array(events.prefix(request.maxSourceEvents))
         let sections = buildSections(from: trimmedEvents)
         let eventsByID = Dictionary(uniqueKeysWithValues: trimmedEvents.map { ($0.id, $0) })
@@ -168,7 +168,7 @@ public actor JournalGenerator {
 
     private func renderMarkdown(for date: Date, sections: [JournalSection], events: [ActivityEvent]) -> String {
         guard sections.isEmpty == false else {
-            return "No activity captured yet for \(OpenbirdDateFormatting.weekdayFormatter.string(from: date))."
+            return "No meaningful activity captured yet for \(OpenbirdDateFormatting.weekdayFormatter.string(from: date))."
         }
 
         let eventsByID = Dictionary(uniqueKeysWithValues: events.map { ($0.id, $0) })
@@ -308,6 +308,18 @@ public actor JournalGenerator {
             let prefix = values.dropLast().joined(separator: ", ")
             return "\(prefix), and \(values[values.count - 1])"
         }
+    }
+
+    private func isMeaningfulEvent(_ event: ActivityEvent) -> Bool {
+        if event.bundleId == "com.apple.loginwindow" || event.appName.normalizedComparisonKey == "loginwindow" {
+            return false
+        }
+
+        let hasUsefulText = event.visibleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        let hasUsefulURL = (event.url?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+        let hasSpecificTitle = (event.detailTitle?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+
+        return hasUsefulText || hasUsefulURL || hasSpecificTitle
     }
 }
 

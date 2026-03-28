@@ -24,6 +24,13 @@ struct SnapshotSanitizer {
         return sanitized
     }
 
+    func shouldDiscard(_ snapshot: WindowSnapshot) -> Bool {
+        if snapshot.bundleId == "com.apple.loginwindow" || snapshot.appName.normalizedComparisonKey == "loginwindow" {
+            return true
+        }
+        return false
+    }
+
     private func normalizedWindowTitle(_ title: String, bundleId: String) -> String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.isEmpty == false else { return "" }
@@ -60,10 +67,36 @@ struct SnapshotSanitizer {
             .components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .map { normalizedWindowTitle($0, bundleId: bundleId) }
+            .map { cleanedLine($0, bundleId: bundleId) }
             .filter { $0.isEmpty == false }
             .filter { isDuplicateLine($0, title: title, appName: appName, bundleId: bundleId) == false }
             .filter { isLowSignalLine($0, bundleId: bundleId) == false }
             .deduplicatedByNormalizedText()
+    }
+
+    private func cleanedLine(_ line: String, bundleId: String) -> String {
+        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.isEmpty == false else { return "" }
+
+        if browserBundleIDs.contains(bundleId) {
+            if browserChromeFragments.filter({ trimmed.normalizedComparisonKey.contains($0) }).count >= 2 {
+                return ""
+            }
+        }
+
+        if bundleId == "com.kakao.KakaoTalkMac" {
+            if kakaoTalkChromeFragments.filter({ trimmed.normalizedComparisonKey.contains($0) }).count >= 2 {
+                return ""
+            }
+        }
+
+        if bundleId == "com.tinyspeck.slackmacgap" {
+            if slackChromeFragments.filter({ trimmed.normalizedComparisonKey.contains($0) }).count >= 2 {
+                return ""
+            }
+        }
+
+        return trimmed
     }
 
     private func normalizedSlackTitle(_ title: String) -> String {
@@ -146,6 +179,11 @@ struct SnapshotSanitizer {
             return true
         }
 
+        if browserBundleIDs.contains(bundleId),
+           browserChromeFragments.contains(where: normalized.contains) {
+            return true
+        }
+
         if bundleId == "com.apple.MobileSMS" {
             if messageChromeLines.contains(normalized) {
                 return true
@@ -157,6 +195,9 @@ struct SnapshotSanitizer {
 
         if bundleId == "com.kakao.KakaoTalkMac" {
             if kakaoTalkChromeLines.contains(normalized) {
+                return true
+            }
+            if kakaoTalkChromeFragments.contains(where: normalized.contains) {
                 return true
             }
             if normalized.contains("new message") || normalized.contains("new messages") {
@@ -174,6 +215,11 @@ struct SnapshotSanitizer {
         }
 
         if bundleId == "com.tinyspeck.slackmacgap" && normalized == "slack" {
+            return true
+        }
+
+        if bundleId == "com.tinyspeck.slackmacgap",
+           slackChromeFragments.contains(where: normalized.contains) {
             return true
         }
 
@@ -218,6 +264,28 @@ private let messageChromeLines: Set<String> = [
     "start facetime",
 ]
 
+private let browserBundleIDs: Set<String> = [
+    "com.apple.Safari",
+    "com.google.Chrome",
+    "company.thebrowser.Browser",
+    "com.brave.Browser",
+    "com.microsoft.edgemac",
+]
+
+private let browserChromeFragments: [String] = [
+    "add page to reading list",
+    "downloads",
+    "go back",
+    "go forward",
+    "page menu",
+    "pinned tabs",
+    "show sidebar",
+    "sidebar",
+    "tab bar",
+    "tab group picker",
+    "tabs",
+]
+
 private let kakaoTalkChromeLines: Set<String> = [
     "add chatroom",
     "all folder",
@@ -236,4 +304,28 @@ private let kakaoTalkChromeLines: Set<String> = [
     "settings",
     "silent chatroom",
     "unread folder",
+]
+
+private let kakaoTalkChromeFragments: [String] = [
+    "add chatroom",
+    "all folder",
+    "chatroom folder",
+    "common icon",
+    "newdot",
+    "notifications",
+    "search",
+    "settings",
+    "silent chatroom",
+    "unread folder",
+]
+
+private let slackChromeFragments: [String] = [
+    "activity",
+    "channels",
+    "direct messages",
+    "huddles",
+    "jump to",
+    "later",
+    "more",
+    "threads",
 ]

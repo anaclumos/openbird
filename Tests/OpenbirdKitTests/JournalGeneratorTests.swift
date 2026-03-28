@@ -149,4 +149,66 @@ struct JournalGeneratorTests {
         }
         #expect(bullets.count == 2)
     }
+
+    @Test func ignoresLowSignalEventsInGeneratedReview() async throws {
+        let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
+        let store = try OpenbirdStore(databaseURL: databaseURL)
+        let generator = JournalGenerator(store: store)
+
+        let start = Calendar.current.startOfDay(for: Date()).addingTimeInterval(8 * 3600)
+        let events = [
+            ActivityEvent(
+                startedAt: start,
+                endedAt: start.addingTimeInterval(60),
+                bundleId: "com.apple.loginwindow",
+                appName: "loginwindow",
+                windowTitle: "loginwindow",
+                url: nil,
+                visibleText: "",
+                source: "accessibility",
+                contentHash: "loginwindow",
+                isExcluded: false
+            ),
+            ActivityEvent(
+                startedAt: start.addingTimeInterval(120),
+                endedAt: start.addingTimeInterval(180),
+                bundleId: "com.openai.codex",
+                appName: "Codex",
+                windowTitle: "Codex",
+                url: nil,
+                visibleText: "",
+                source: "accessibility",
+                contentHash: "codex",
+                isExcluded: false
+            ),
+            ActivityEvent(
+                startedAt: start.addingTimeInterval(240),
+                endedAt: start.addingTimeInterval(600),
+                bundleId: "com.apple.Safari",
+                appName: "Safari",
+                windowTitle: "ComputelessComputer/openbird",
+                url: "https://github.com/ComputelessComputer/openbird",
+                visibleText: "Reviewed PR about preserving Google Calendar selections across sync.",
+                source: "accessibility",
+                contentHash: "safari",
+                isExcluded: false
+            ),
+        ]
+
+        for event in events {
+            try await store.saveActivityEvent(event)
+        }
+
+        let journal = try await generator.generate(
+            request: JournalGenerationRequest(
+                date: start,
+                providerID: nil
+            )
+        )
+
+        #expect(journal.sections.count == 1)
+        #expect(journal.sections.first?.heading == "ComputelessComputer/openbird")
+        #expect(journal.markdown.contains("loginwindow") == false)
+        #expect(journal.markdown.contains("Codex") == false)
+    }
 }
