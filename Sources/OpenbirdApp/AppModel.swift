@@ -302,6 +302,10 @@ final class AppModel: ObservableObject {
         runUpdateCheck(force: true, showUpToDateMessage: true)
     }
 
+    func handleAppDidBecomeActive() {
+        checkForUpdatesIfNeeded()
+    }
+
     func dismissAvailableUpdate() {
         guard let availableUpdate else {
             return
@@ -562,6 +566,9 @@ final class AppModel: ObservableObject {
 
     private func checkForUpdatesIfNeeded() {
         guard appVersion != nil else {
+            return
+        }
+        guard updateCheckTask == nil else {
             return
         }
 
