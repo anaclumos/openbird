@@ -10,14 +10,19 @@ public actor ChatService {
     }
 
     @discardableResult
+    public func createThread(for day: String) async throws -> ChatThread {
+        let thread = ChatThread(title: "Chat for \(day)", startDay: day)
+        try await store.saveThread(thread)
+        return thread
+    }
+
+    @discardableResult
     public func ensureThread(for day: String) async throws -> ChatThread {
         let threads = try await store.loadThreads()
         if let existing = threads.first(where: { $0.startDay == day }) {
             return existing
         }
-        let thread = ChatThread(title: "Chat for \(day)", startDay: day)
-        try await store.saveThread(thread)
-        return thread
+        return try await createThread(for: day)
     }
 
     public func answer(_ query: ChatQuery) async throws -> ChatMessage {

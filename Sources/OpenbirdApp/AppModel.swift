@@ -539,6 +539,32 @@ final class AppModel: ObservableObject {
         shouldFocusChatComposer = true
     }
 
+    func startNewChat() {
+        chatSendTask?.cancel()
+        clearTransientChatState()
+
+        let day = OpenbirdDateFormatting.dayString(for: selectedDay)
+        Task { [weak self] in
+            guard let self else {
+                return
+            }
+
+            do {
+                let thread = try await chatService.createThread(for: day)
+                guard OpenbirdDateFormatting.dayString(for: selectedDay) == day else {
+                    return
+                }
+
+                chatThread = thread
+                chatMessages = []
+                chatInput = ""
+                shouldFocusChatComposer = true
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
     func setQuitApplicationHandler(_ handler: @escaping () -> Void) {
         quitApplication = handler
     }

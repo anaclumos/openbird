@@ -5,6 +5,21 @@ enum OpenbirdSceneID {
     static let main = "main"
 }
 
+struct ChatCommandContext {
+    let startNewChat: () -> Void
+}
+
+private struct ChatCommandContextKey: FocusedValueKey {
+    typealias Value = ChatCommandContext
+}
+
+extension FocusedValues {
+    var chatCommandContext: ChatCommandContext? {
+        get { self[ChatCommandContextKey.self] }
+        set { self[ChatCommandContextKey.self] = newValue }
+    }
+}
+
 @main
 struct OpenbirdAppMain: App {
     @NSApplicationDelegateAdaptor(AppLifecycleController.self) private var appLifecycle
@@ -44,12 +59,21 @@ private struct OpenbirdAppCommands: Commands {
     @ObservedObject var model: AppModel
     let appLifecycle: AppLifecycleController
     @Environment(\.openWindow) private var openWindow
+    @FocusedValue(\.chatCommandContext) private var chatCommandContext
 
     var body: some Commands {
         CommandGroup(after: .appInfo) {
             Button("Check for Updates…") {
                 model.checkForUpdates()
             }
+        }
+
+        CommandGroup(replacing: .newItem) {
+            Button("New Chat") {
+                chatCommandContext?.startNewChat()
+            }
+            .keyboardShortcut("n", modifiers: [.command])
+            .disabled(chatCommandContext == nil)
         }
 
         CommandGroup(replacing: .appTermination) {
@@ -66,6 +90,11 @@ private struct OpenbirdAppCommands: Commands {
                 NSApp.activate(ignoringOtherApps: true)
             }
             .keyboardShortcut("j", modifiers: [.command])
+
+            Button("New Chat") {
+                chatCommandContext?.startNewChat()
+            }
+            .disabled(chatCommandContext == nil)
         }
     }
 }

@@ -24,7 +24,8 @@ struct TodayChatDock: View {
                 model: model,
                 focusedField: focusedField,
                 expand: expandChat,
-                send: sendChat
+                send: sendChat,
+                startNewChat: startNewChat
             )
         }
         .frame(maxWidth: contentWidth)
@@ -95,6 +96,11 @@ struct TodayChatDock: View {
     private func sendChat() {
         expandChat()
         model.sendChat()
+    }
+
+    private func startNewChat() {
+        expandChat()
+        model.startNewChat()
     }
 
     private func scrollToBottom(using proxy: ScrollViewProxy, animated: Bool = true) {
@@ -240,6 +246,7 @@ private struct ChatComposer: View {
     var focusedField: FocusState<TodayChatDock.FocusField?>.Binding
     let expand: () -> Void
     let send: () -> Void
+    let startNewChat: () -> Void
 
     private var canSend: Bool {
         model.chatThread != nil &&
@@ -254,6 +261,10 @@ private struct ChatComposer: View {
                 .font(.body)
                 .lineLimit(1...6)
                 .focused(focusedField, equals: .composer)
+                .focusedSceneValue(
+                    \.chatCommandContext,
+                    ChatCommandContext(startNewChat: startNewChat)
+                )
                 .onSubmit(send)
                 .padding(.leading, 18)
                 .padding(.trailing, 64)
