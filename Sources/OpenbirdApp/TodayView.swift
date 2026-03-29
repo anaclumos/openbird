@@ -33,10 +33,6 @@ struct TodayView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    if model.needsOnboarding {
-                        SetupChecklistView(model: model)
-                    }
-
                     if let loadingStatus = activeLoadingStatus, timelineContent.isEmpty {
                         LoadingStatusCard(status: loadingStatus)
                             .frame(maxWidth: .infinity, minHeight: 280)
