@@ -607,24 +607,57 @@ private struct JournalMarkdownBlockView: View {
     var body: some View {
         switch block {
         case .paragraph(let text):
-            Text(text)
-                .font(.body)
-                .foregroundStyle(.primary)
-                .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+            JournalMarkdownText(
+                markdown: text,
+                font: .body,
+                color: .primary
+            )
         case .bulletList(let items):
             VStack(alignment: .leading, spacing: 8) {
                 ForEach(items, id: \.self) { item in
-                    Text("• \(item)")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text("•")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        JournalMarkdownText(
+                            markdown: item,
+                            font: .subheadline,
+                            color: .secondary
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
             }
         case .table(let table):
             JournalMarkdownTableView(table: table)
         }
+    }
+}
+
+private struct JournalMarkdownText: View {
+    let markdown: String
+    let font: Font
+    let color: Color
+
+    var body: some View {
+        Text(renderedText)
+            .font(font)
+            .foregroundStyle(color)
+            .textSelection(.enabled)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var renderedText: AttributedString {
+        let options = AttributedString.MarkdownParsingOptions(
+            interpretedSyntax: .inlineOnlyPreservingWhitespace
+        )
+
+        if let attributed = try? AttributedString(markdown: markdown, options: options) {
+            return attributed
+        }
+
+        return AttributedString(markdown)
     }
 }
 
@@ -651,10 +684,11 @@ private struct JournalMarkdownTableView: View {
     private func row(_ values: [String], isHeader: Bool) -> some View {
         HStack(alignment: .top, spacing: 12) {
             ForEach(Array(values.enumerated()), id: \.offset) { _, value in
-                Text(value)
-                    .font(isHeader ? .subheadline.weight(.semibold) : .subheadline)
-                    .foregroundStyle(isHeader ? .primary : .secondary)
-                    .textSelection(.enabled)
+                JournalMarkdownText(
+                    markdown: value,
+                    font: isHeader ? .subheadline.weight(.semibold) : .subheadline,
+                    color: isHeader ? .primary : .secondary
+                )
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
