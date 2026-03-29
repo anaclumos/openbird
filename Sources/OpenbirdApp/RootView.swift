@@ -71,10 +71,15 @@ struct RootView: View {
     }
 
     private func configureAppLifecycle() {
-        appLifecycle.configure {
-            openWindow(id: OpenbirdSceneID.main)
-            NSApp.activate(ignoringOtherApps: true)
-        }
+        appLifecycle.configure(
+            openMainWindow: {
+                openWindow(id: OpenbirdSceneID.main)
+                NSApp.activate(ignoringOtherApps: true)
+            },
+            prepareForTermination: {
+                await model.prepareForTermination()
+            }
+        )
         model.setQuitApplicationHandler {
             appLifecycle.quitCompletely()
         }

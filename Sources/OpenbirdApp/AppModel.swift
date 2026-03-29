@@ -90,6 +90,7 @@ final class AppModel: ObservableObject {
     private let appUpdater: AppUpdater
     private let userDefaults: UserDefaults
     private var quitApplication: () -> Void = { NSApp.terminate(nil) }
+    private var initialRefreshTask: Task<Void, Never>?
     private var providerConnectionTask: Task<Void, Never>?
     private var providerSaveTask: Task<Void, Never>?
     private var updateCheckTask: Task<Void, Never>?
@@ -98,6 +99,7 @@ final class AppModel: ObservableObject {
     private var chatSendTask: Task<Void, Never>?
     private var providerConnectionRequestID = UUID()
     private var updateCheckRequestID = UUID()
+    private var isShuttingDown = false
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -131,13 +133,14 @@ final class AppModel: ObservableObject {
         accessibilityTrusted = permissionsService.isAccessibilityTrusted
         collectorRuntime.start()
         refreshInstalledApplications()
-        Task {
+        initialRefreshTask = Task {
             await refresh()
         }
         checkForUpdatesIfNeeded()
     }
 
     deinit {
+        initialRefreshTask?.cancel()
         chatSendTask?.cancel()
         providerConnectionTask?.cancel()
         providerSaveTask?.cancel()
@@ -379,7 +382,25 @@ final class AppModel: ObservableObject {
         return version
     }
 
+    func prepareForTermination() async {
+        guard isShuttingDown == false else {
+            return
+        }
+
+        isShuttingDown = true
+        initialRefreshTask?.cancel()
+        chatSendTask?.cancel()
+        providerConnectionTask?.cancel()
+        providerSaveTask?.cancel()
+        updateCheckTask?.cancel()
+        await collectorRuntime.stopAndWait()
+    }
+
     func refresh() async {
+        guard isShuttingDown == false else {
+            return
+        }
+
         chatSendTask?.cancel()
         clearTransientChatState()
         refreshAccessibilityPermissionState()

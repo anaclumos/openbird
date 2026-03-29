@@ -13,10 +13,12 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
     private let ownerID: String
     private let ownerName: String
     private let leaseTimeout: TimeInterval
+    private let lifecycleLock = NSLock()
     private var timer: Timer?
     private var currentEvent: ActivityEvent?
     private var currentFingerprint: String?
     private var ownsLease = false
+    private var isStopped = true
 
     public init(
         store: OpenbirdStore,
@@ -45,6 +47,14 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
     }
 
     public func start() {
+        lifecycleLock.lock()
+        guard isStopped else {
+            lifecycleLock.unlock()
+            return
+        }
+        isStopped = false
+        lifecycleLock.unlock()
+
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(activeApplicationChanged),
@@ -52,35 +62,53 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             object: nil
         )
         timer = Timer.scheduledTimer(withTimeInterval: captureInterval, repeats: true) { [weak self] _ in
-            Task { await self?.captureNow() }
+            self?.scheduleCapture()
         }
-        Task { await captureNow() }
+        scheduleCapture()
     }
 
     public func stop() {
+        lifecycleLock.lock()
+        isStopped = true
+        lifecycleLock.unlock()
         timer?.invalidate()
         timer = nil
         NSWorkspace.shared.notificationCenter.removeObserver(self)
-        Task { [weak self] in
-            guard let self else { return }
-            if ownsLease {
-                try? await store.releaseCollectorLease(ownerID: ownerID)
-            }
+        currentEvent = nil
+        currentFingerprint = nil
+    }
+
+    public func stopAndWait() async {
+        stop()
+        await captureGate.waitUntilIdle()
+        guard ownsLease else {
+            return
         }
+        try? await store.releaseCollectorLease(ownerID: ownerID)
+        ownsLease = false
     }
 
     @objc private func activeApplicationChanged() {
-        Task { await captureNow() }
+        scheduleCapture()
     }
 
     public func captureNow() async {
+        guard shouldCapture else {
+            return
+        }
         await captureGate.runIfIdle {
+            guard self.shouldCapture else {
+                return
+            }
             await performCaptureNow()
         }
     }
 
     private func performCaptureNow() async {
         do {
+            guard shouldCapture else {
+                return
+            }
             let now = Date()
             let claimedLease = try await store.claimCollectorLease(
                 ownerID: ownerID,
@@ -96,6 +124,10 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             }
             ownsLease = true
 
+            guard shouldCapture else {
+                return
+            }
+
             var settings = try await store.loadSettings()
             if settings.normalizeCapturePause(now: now, sessionID: ownerID) {
                 try await store.saveSettings(settings)
@@ -107,8 +139,16 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
                 return
             }
 
+            guard shouldCapture else {
+                return
+            }
+
             guard let frontmostApplication = await MainActor.run(body: { FrontmostApplicationContext.current() }) else {
                 _ = try await store.updateCollectorStatus(ownerID: ownerID, status: "idle", heartbeat: now)
+                return
+            }
+
+            guard shouldCapture else {
                 return
             }
 
@@ -120,9 +160,14 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             }
 
             if snapshot.url == nil {
-                snapshot.url = await MainActor.run {
-                    browserURLResolver.currentURL(for: snapshot.bundleId, windowTitle: snapshot.windowTitle)
-                }
+                snapshot.url = browserURLResolver.currentURL(
+                    for: snapshot.bundleId,
+                    windowTitle: snapshot.windowTitle
+                )
+            }
+
+            guard shouldCapture else {
+                return
             }
 
             let exclusions = try await store.loadExclusions()
@@ -145,15 +190,43 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             }
         }
     }
+
+    private var shouldCapture: Bool {
+        lifecycleLock.lock()
+        defer { lifecycleLock.unlock() }
+        return isStopped == false
+    }
+
+    private func scheduleCapture() {
+        Task { [weak self] in
+            await self?.captureNow()
+        }
+    }
 }
 
 actor CaptureGate {
     private var isRunning = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
 
     func runIfIdle(_ operation: @Sendable () async -> Void) async {
         guard isRunning == false else { return }
         isRunning = true
-        defer { isRunning = false }
+        defer {
+            isRunning = false
+            let pendingWaiters = waiters
+            waiters.removeAll()
+            pendingWaiters.forEach { $0.resume() }
+        }
         await operation()
+    }
+
+    func waitUntilIdle() async {
+        guard isRunning else {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            waiters.append(continuation)
+        }
     }
 }

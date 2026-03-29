@@ -3,18 +3,16 @@ import Foundation
 
 public struct BrowserURLResolver: Sendable {
     private static let cacheLifetime: TimeInterval = 15
-    @MainActor private static var cache: [String: CacheEntry] = [:]
+    private static let cache = URLResolutionCache()
 
     public init() {}
 
-    @MainActor
     public func currentURL(for bundleID: String, windowTitle: String) -> String? {
         guard isPrivateWindow(title: windowTitle) == false else { return nil }
 
         let cacheKey = "\(bundleID)|\(windowTitle)"
         let now = Date()
-        if let cached = Self.cache[cacheKey],
-           now.timeIntervalSince(cached.resolvedAt) <= Self.cacheLifetime {
+        if let cached = cachedURL(for: cacheKey, now: now) {
             return cached.url
         }
 
@@ -38,8 +36,7 @@ public struct BrowserURLResolver: Sendable {
             resolvedURL = nil
         }
 
-        Self.cache = Self.cache.filter { now.timeIntervalSince($0.value.resolvedAt) <= Self.cacheLifetime }
-        Self.cache[cacheKey] = CacheEntry(url: resolvedURL, resolvedAt: now)
+        cacheResolvedURL(resolvedURL, for: cacheKey, now: now)
         return resolvedURL
     }
 
@@ -56,9 +53,41 @@ public struct BrowserURLResolver: Sendable {
         let value = result.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines)
         return value?.isEmpty == true ? nil : value
     }
+
+    private func cachedURL(for key: String, now: Date) -> CacheEntry? {
+        Self.cache.cachedURL(for: key, now: now, cacheLifetime: Self.cacheLifetime)
+    }
+
+    private func cacheResolvedURL(_ url: String?, for key: String, now: Date) {
+        Self.cache.store(url: url, for: key, now: now, cacheLifetime: Self.cacheLifetime)
+    }
 }
 
 private struct CacheEntry {
     let url: String?
     let resolvedAt: Date
+}
+
+private final class URLResolutionCache: @unchecked Sendable {
+    private let lock = NSLock()
+    private var cache: [String: CacheEntry] = [:]
+
+    func cachedURL(for key: String, now: Date, cacheLifetime: TimeInterval) -> CacheEntry? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let cached = cache[key],
+              now.timeIntervalSince(cached.resolvedAt) <= cacheLifetime else {
+            return nil
+        }
+
+        return cached
+    }
+
+    func store(url: String?, for key: String, now: Date, cacheLifetime: TimeInterval) {
+        lock.lock()
+        defer { lock.unlock() }
+        cache = cache.filter { now.timeIntervalSince($0.value.resolvedAt) <= cacheLifetime }
+        cache[key] = CacheEntry(url: url, resolvedAt: now)
+    }
 }
