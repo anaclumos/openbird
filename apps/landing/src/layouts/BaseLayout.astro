@@ -28,6 +28,10 @@ const {
 <style is:global>
   :root {
     color-scheme: light;
+    --text: #111111;
+    --muted: #505050;
+    --line: #d4d4d4;
+    --link: #165dff;
   }
 
   * {
@@ -35,42 +39,34 @@ const {
   }
 
   body {
-    margin: 0;
+    margin: 10px auto;
     min-width: 320px;
-    font-family: Georgia, "Times New Roman", serif;
-    font-size: 18px;
-    line-height: 1.55;
-    color: #111111;
+    font-family:
+      Inter,
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    font-size: 17px;
+    line-height: 1.58;
+    color: var(--text);
     background: #ffffff;
   }
 
   a {
-    color: #0000ee;
+    color: var(--link);
+    text-underline-offset: 0.16em;
   }
 
-  a:visited {
-    color: #551a8b;
+  a:hover {
+    text-decoration-thickness: 2px;
   }
 
   img {
     display: block;
     max-width: 100%;
-  }
-
-  main {
-    display: block;
-  }
-
-  .page {
-    max-width: 760px;
-    margin: 0 auto;
-    padding: 24px 16px 64px;
-  }
-
-  header,
-  section,
-  footer {
-    display: block;
   }
 
   h1,
@@ -79,81 +75,92 @@ const {
   p,
   ul,
   ol,
-  pre {
+  hr {
     margin: 0 0 16px;
   }
 
   h1,
   h2,
   h3 {
-    font-family: "Times New Roman", Times, serif;
-    font-weight: 700;
-    line-height: 1.2;
+    font-weight: 600;
+    line-height: 1.25;
   }
 
   h1 {
-    font-size: 2.4rem;
+    font-size: 2.2rem;
   }
 
   h2 {
-    font-size: 1.6rem;
-    margin-top: 32px;
+    font-size: 1.55rem;
   }
 
   h3 {
-    font-size: 1.15rem;
+    font-size: 1.05rem;
   }
 
   hr {
-    margin: 24px 0;
     border: 0;
-    border-top: 1px solid #cccccc;
+    border-top: 1px solid var(--line);
   }
 
   ul,
   ol {
-    padding-left: 24px;
+    padding-left: 22px;
   }
 
   li {
     margin-bottom: 8px;
   }
 
-  nav ul {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px 20px;
-    padding-left: 20px;
-  }
-
-  pre,
-  code {
-    font-family: "Courier New", Courier, monospace;
-    font-size: 0.95em;
-  }
-
+  code,
   pre {
-    overflow-x: auto;
-    padding: 12px;
-    border: 1px solid #cccccc;
-    background: #f7f7f7;
+    font-family:
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      Consolas,
+      "Liberation Mono",
+      monospace;
+    font-size: 0.92em;
+  }
+
+  .page {
+    max-width: 700px;
+    margin-right: 16px;
+    margin-left: 22px;
+  }
+
+  .header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 8px;
+  }
+
+  .header-icon {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 auto;
   }
 
   .muted {
-    color: #444444;
+    color: var(--muted);
   }
 
   .small {
     font-size: 0.95rem;
   }
 
-  @media (max-width: 640px) {
+  @media (min-width: 768px) {
     body {
-      font-size: 17px;
+      margin-top: 60px;
+      margin-bottom: 40px;
     }
 
-    h1 {
-      font-size: 2rem;
+    .page {
+      margin-left: 80px;
+      margin-right: auto;
     }
   }
 </style>
