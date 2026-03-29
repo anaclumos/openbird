@@ -263,7 +263,12 @@ final class AppModel: ObservableObject {
         }
 
         do {
+            let requestedDay = selectedDay
             let previousProviderID = editingProvider.id
+            rawEvents = []
+            todayJournal = nil
+            chatThread = nil
+            chatMessages = []
             dayLoadStatus = Self.makeDayLoadStatus(
                 step: 1,
                 totalSteps: 5,
@@ -284,36 +289,63 @@ final class AppModel: ObservableObject {
                 availableProviderModels = []
             }
 
-            let dayRange = Calendar.current.dayRange(for: selectedDay)
+            let dayRange = Calendar.current.dayRange(for: requestedDay)
+            let day = OpenbirdDateFormatting.dayString(for: requestedDay)
             dayLoadStatus = Self.makeDayLoadStatus(
                 step: 2,
                 totalSteps: 5,
                 title: "Reading captured activity",
                 detail: "Querying the local timeline database for raw events recorded on the selected day."
             )
-            rawEvents = try await store.loadActivityEvents(in: dayRange, includeExcluded: true)
+            let loadedRawEvents = try await store.loadActivityEvents(in: dayRange, includeExcluded: true)
             dayLoadStatus = Self.makeDayLoadStatus(
                 step: 3,
                 totalSteps: 5,
                 title: "Loading saved summary",
                 detail: "Checking whether Openbird already has a journal summary cached for this day."
             )
-            todayJournal = try await store.loadJournal(for: OpenbirdDateFormatting.dayString(for: selectedDay))
+            var loadedJournal = try await store.loadJournal(for: day)
+
+            let shouldGenerateDefaultJournal = loadedJournal == nil && loadedRawEvents.isEmpty == false
+            let totalDayLoadSteps = shouldGenerateDefaultJournal ? 6 : 5
+
+            if shouldGenerateDefaultJournal {
+                dayLoadStatus = Self.makeDayLoadStatus(
+                    step: 4,
+                    totalSteps: totalDayLoadSteps,
+                    title: "Generating the default summary",
+                    detail: "Building the day view that opens by default from the captured activity you already have."
+                )
+                isGeneratingTodayJournal = true
+                defer {
+                    isGeneratingTodayJournal = false
+                }
+                loadedJournal = try await generateJournal(for: requestedDay)
+            }
+
             dayLoadStatus = Self.makeDayLoadStatus(
-                step: 4,
-                totalSteps: 5,
+                step: shouldGenerateDefaultJournal ? 5 : 4,
+                totalSteps: totalDayLoadSteps,
                 title: "Restoring chat thread",
                 detail: "Finding the conversation that belongs to this day so follow-up questions stay anchored."
             )
-            let thread = try await chatService.ensureThread(for: OpenbirdDateFormatting.dayString(for: selectedDay))
-            chatThread = thread
+            let thread = try await chatService.ensureThread(for: day)
             dayLoadStatus = Self.makeDayLoadStatus(
-                step: 5,
-                totalSteps: 5,
+                step: shouldGenerateDefaultJournal ? 6 : 5,
+                totalSteps: totalDayLoadSteps,
                 title: "Loading prior answers",
                 detail: "Pulling earlier messages into memory so the dock can answer with full context."
             )
-            chatMessages = try await store.loadMessages(threadID: thread.id)
+            let loadedChatMessages = try await store.loadMessages(threadID: thread.id)
+
+            guard OpenbirdDateFormatting.dayString(for: selectedDay) == day else {
+                return
+            }
+
+            rawEvents = loadedRawEvents
+            todayJournal = loadedJournal
+            chatThread = thread
+            chatMessages = loadedChatMessages
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -819,14 +851,13 @@ final class AppModel: ObservableObject {
 
         isGeneratingTodayJournal = true
         Task {
+            let requestedDay = selectedDay
             defer { isGeneratingTodayJournal = false }
             do {
-                let journal = try await journalGenerator.generate(
-                    request: JournalGenerationRequest(
-                        date: selectedDay,
-                        providerID: settings.activeProviderID
-                    )
-                )
+                let journal = try await generateJournal(for: requestedDay)
+                guard OpenbirdDateFormatting.dayString(for: selectedDay) == OpenbirdDateFormatting.dayString(for: requestedDay) else {
+                    return
+                }
                 todayJournal = journal
             } catch {
                 errorMessage = error.localizedDescription
@@ -859,5 +890,14 @@ final class AppModel: ObservableObject {
         Task {
             await refresh()
         }
+    }
+
+    private func generateJournal(for day: Date) async throws -> DailyJournal {
+        try await journalGenerator.generate(
+            request: JournalGenerationRequest(
+                date: day,
+                providerID: settings.activeProviderID
+            )
+        )
     }
 }
