@@ -29,7 +29,13 @@ public struct AccessibilitySnapshotter: Sendable {
 
     public init() {}
 
+    @MainActor
     func snapshotFrontmostWindow(for application: FrontmostApplicationContext) -> WindowSnapshot? {
+        if shouldUseMinimalSnapshot(for: application) {
+            let snapshot = snapshotSanitizer.sanitize(minimalSnapshot(for: application))
+            return snapshotSanitizer.shouldDiscard(snapshot) ? nil : snapshot
+        }
+
         let axApplication = AXUIElementCreateApplication(application.processIdentifier)
         guard let focusedWindow = copyElementAttribute(axApplication, attribute: kAXFocusedWindowAttribute)
                 ?? copyElementAttribute(axApplication, attribute: kAXMainWindowAttribute)
@@ -72,6 +78,20 @@ public struct AccessibilitySnapshotter: Sendable {
             visibleText: "",
             source: "workspace"
         )
+    }
+
+    private func shouldUseMinimalSnapshot(for application: FrontmostApplicationContext) -> Bool {
+        if application.processIdentifier == ProcessInfo.processInfo.processIdentifier {
+            return true
+        }
+
+        guard let currentBundleID = Bundle.main.bundleIdentifier?.trimmingCharacters(in: .whitespacesAndNewlines),
+              currentBundleID.isEmpty == false
+        else {
+            return false
+        }
+
+        return currentBundleID.caseInsensitiveCompare(application.bundleID) == .orderedSame
     }
 
     private func collectVisibleText(

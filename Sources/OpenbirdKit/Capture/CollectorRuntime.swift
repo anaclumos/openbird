@@ -109,7 +109,9 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
                 return
             }
 
-            guard var snapshot = snapshotter.snapshotFrontmostWindow(for: frontmostApplication) else {
+            guard var snapshot = await MainActor.run(body: {
+                snapshotter.snapshotFrontmostWindow(for: frontmostApplication)
+            }) else {
                 _ = try await store.updateCollectorStatus(ownerID: ownerID, status: "idle", heartbeat: now)
                 return
             }
