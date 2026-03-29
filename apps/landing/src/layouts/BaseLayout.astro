@@ -32,6 +32,9 @@ const {
     --muted: #505050;
     --line: #d4d4d4;
     --link: #165dff;
+    --code-text: #16314f;
+    --code-line: #dbe4f0;
+    --code-bg: #f5f8fc;
     --body-line-height: 1.58;
     --title-size: 1.85rem;
     --title-line-height: 1.25;
@@ -128,6 +131,32 @@ const {
       "Liberation Mono",
       monospace;
     font-size: 0.92em;
+  }
+
+  code {
+    padding: 0.12rem 0.38rem;
+    border: 1px solid var(--code-line);
+    border-radius: 6px;
+    background: var(--code-bg);
+    color: var(--code-text);
+  }
+
+  pre {
+    overflow-x: auto;
+    padding: 14px 16px;
+    border: 1px solid var(--code-line);
+    border-radius: 10px;
+    background: linear-gradient(180deg, #f8fbff 0%, #f3f7fb 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+
+  pre code {
+    display: block;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
   }
 
   .page {
