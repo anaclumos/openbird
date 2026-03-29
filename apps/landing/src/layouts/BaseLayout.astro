@@ -32,8 +32,11 @@ const {
     --muted: #505050;
     --line: #d4d4d4;
     --link: #165dff;
+    --body-line-height: 1.58;
     --title-size: 1.85rem;
     --title-line-height: 1.25;
+    --subtitle-size: 0.92rem;
+    --header-gap: 6px;
   }
 
   * {
@@ -52,7 +55,7 @@ const {
       "Segoe UI",
       sans-serif;
     font-size: 15px;
-    line-height: 1.58;
+    line-height: var(--body-line-height);
     color: var(--text);
     background: #ffffff;
   }
@@ -135,30 +138,33 @@ const {
 
   .header {
     display: grid;
-    gap: 6px;
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+    row-gap: var(--header-gap);
+    align-items: start;
     margin-bottom: 8px;
   }
 
-  .header-title-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
-
   .header-icon {
+    grid-row: 1 / span 2;
     width: auto;
-    height: calc(var(--title-size) * var(--title-line-height));
-    flex: 0 0 auto;
+    height: calc(
+      (var(--title-size) * var(--title-line-height)) +
+      (var(--subtitle-size) * var(--body-line-height)) +
+      var(--header-gap)
+    );
   }
 
   .header h1 {
+    grid-column: 2;
     margin-bottom: 0;
   }
 
   .header p {
+    grid-column: 2;
     margin-bottom: 0;
     color: var(--muted);
-    font-size: 0.92rem;
+    font-size: var(--subtitle-size);
   }
 
   .muted {
