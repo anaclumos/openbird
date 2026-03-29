@@ -128,12 +128,14 @@ public actor JournalGenerator {
         let appList = Array(section.groupedEvents.map(\.appName).deduplicatedByNormalizedText())
 
         return """
+        Raw evidence chunk
         Time window: \(section.timeRange)
         Raw label candidate (do not copy blindly): \(section.heading)
         Apps involved: \(naturalLanguageList(appList))
-        Better framing target:
+        Interpretation guidance:
         - Describe what the user was trying to do, decide, compare, write, debug, or follow up on.
         - Do not use a bare tool, site, repo, or channel name as the heading when a task-level description is possible.
+        - This chunk can be merged with adjacent chunks if they belong to the same broader activity.
         Evidence:
         \(evidence.isEmpty ? "- No detailed evidence available." : evidence)
         """
@@ -149,11 +151,14 @@ public actor JournalGenerator {
         Requirements:
         - Return markdown only.
         - Do not include a document title or repeat the date as a top heading.
-        - Start with a short framing sentence only if it adds value.
-        - Then write 4-8 chronological sections using markdown `##` headings.
+        - Start with a short framing sentence that captures the overall shape of the day when possible.
+        - Then write 3-7 chronological sections using markdown `##` headings.
         - Each section heading should combine the approximate time or time range with a human activity label, for example `## ~3:15 PM - 4:15 PM - Comparing AI meeting-note tools`.
         - Headings must describe the user's likely task, intent, or outcome. Avoid headings that are just tool names, URLs, repo names, or channel names unless there is truly no better inference.
+        - Treat the evidence as raw fragments, not as a required one-fragment-per-section outline. Merge adjacent chunks into a broader section when they are clearly part of the same work mode, project, research thread, or detour.
+        - Favor chapter-like section titles such as `Code Grind`, `Strategy Call`, `Hardware Window Shopping`, `YC Demo Day`, or `Browsing & Twitter` when the evidence supports that level of synthesis.
         - Under each heading, write 1 short paragraph that explains what happened, why it mattered, or what the user was trying to figure out.
+        - If a section covers multiple concrete items, repos, or threads, use bullets under that section to surface the most interesting specifics.
         - Favor verbs like comparing, researching, drafting, reviewing, coordinating, debugging, planning, or replying when the evidence supports them.
         - Mention apps, repos, people, channels, or pages only when they help identify the work. They are supporting detail, not the main point.
         - Merge or omit low-signal noise instead of narrating every app switch.
@@ -161,6 +166,8 @@ public actor JournalGenerator {
         - Prefer meaningful work descriptions over app chrome, repeated browser controls, toolbar labels, or duplicated URLs.
         - Add bullet lists only when they improve clarity, such as decisions, people, deliverables, or candidate lists.
         - Use a markdown table when the evidence clearly contains a compact status list, comparison, or set of PRs.
+        - A short closing `**TL;DR:**` line is allowed when it sharpens the recap.
+        - Keep the tone observant and concise. Slight personality is fine, but do not sound gushy, generic, or like an app changelog.
         - If the evidence is noisy or ambiguous, hedge briefly instead of inventing detail.
 
         Bad headings:
@@ -172,6 +179,9 @@ public actor JournalGenerator {
         - `## 8:37 AM - Checking the judging channel for next steps`
         - `## 12:00 AM - Comparing AI meeting-note tools`
         - `## 2:10 PM - Reviewing pricing and positioning for Stilla`
+        - `## ~9:30 AM - 11:35 AM - Code Grind`
+        - `## ~5:40 PM - Hardware Window Shopping`
+        - `## YouTube Deep Dive`
 
         Day: \(OpenbirdDateFormatting.weekdayFormatter.string(from: date))
 
