@@ -121,6 +121,11 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
         var settings = AppSettings()
         settings.capturePaused = dict["capturePaused"] == "true"
+        if let capturePauseUntil = normalizeOptionalSetting(dict["capturePauseUntil"]),
+           let timestamp = Double(capturePauseUntil) {
+            settings.capturePauseUntil = Date(timeIntervalSince1970: timestamp)
+        }
+        settings.capturePauseSessionID = normalizeOptionalSetting(dict["capturePauseSessionID"])
         settings.retentionDays = Int(dict["retentionDays"] ?? "14") ?? 14
         settings.activeProviderID = normalizeOptionalSetting(dict["activeProviderID"])
         settings.selectedProviderID = normalizeOptionalSetting(dict["selectedProviderID"])
@@ -136,6 +141,8 @@ public final class SQLiteDatabase: @unchecked Sendable {
     public func saveSettings(_ settings: AppSettings) throws {
         let values: [(String, String)] = [
             ("capturePaused", settings.capturePaused ? "true" : "false"),
+            ("capturePauseUntil", settings.capturePauseUntil.map { String($0.timeIntervalSince1970) } ?? ""),
+            ("capturePauseSessionID", settings.capturePauseSessionID ?? ""),
             ("retentionDays", String(settings.retentionDays)),
             ("activeProviderID", settings.activeProviderID ?? ""),
             ("selectedProviderID", settings.selectedProviderID ?? ""),
@@ -156,6 +163,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
     public func claimCollectorLease(ownerID: String, ownerName: String, now: Date, timeout: TimeInterval) throws -> Bool {
         try withImmediateTransaction {
             var settings = try loadSettings()
+            settings.normalizeCapturePause(now: now, sessionID: ownerID)
             let currentOwnerID = settings.collectorOwnerID
             let heartbeatAge = settings.lastCollectorHeartbeat.map { now.timeIntervalSince($0) } ?? .infinity
             let hasFreshOwner = currentOwnerID != nil && heartbeatAge <= timeout
@@ -163,7 +171,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
                 return false
             }
             if currentOwnerID != ownerID {
-                settings.collectorStatus = settings.capturePaused ? "paused" : "idle"
+                settings.collectorStatus = settings.isCapturePaused(now: now, sessionID: ownerID) ? "paused" : "idle"
             }
             settings.collectorOwnerID = ownerID
             settings.collectorOwnerName = ownerName
@@ -189,13 +197,14 @@ public final class SQLiteDatabase: @unchecked Sendable {
     public func releaseCollectorLease(ownerID: String) throws {
         try withImmediateTransaction {
             var settings = try loadSettings()
+            settings.normalizeCapturePause(sessionID: ownerID)
             guard settings.collectorOwnerID == ownerID else {
                 return
             }
             settings.collectorOwnerID = nil
             settings.collectorOwnerName = nil
             settings.lastCollectorHeartbeat = nil
-            settings.collectorStatus = settings.capturePaused ? "paused" : "stopped"
+            settings.collectorStatus = settings.isCapturePaused(sessionID: ownerID) ? "paused" : "stopped"
             try saveSettings(settings)
         }
     }

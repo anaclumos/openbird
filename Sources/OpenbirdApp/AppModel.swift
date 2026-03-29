@@ -59,11 +59,13 @@ final class AppModel: ObservableObject {
     @Published var isShowingRawLogInspector = false
     @Published private(set) var isSendingChat = false
     @Published private(set) var shouldFocusChatComposer = false
+    @Published private(set) var statusMenuContext: CurrentActivityContext?
     @Published private(set) var accessibilityTrusted = false
     @Published private(set) var dayLoadStatus: DayLoadStatus?
 
     let permissionsService = PermissionsService()
     private let store: OpenbirdStore
+    private let currentActivityContextService = CurrentActivityContextService()
     private let installedApplicationService = InstalledApplicationService()
     private let journalGenerator: JournalGenerator
     private let retrievalService: RetrievalService
@@ -202,6 +204,10 @@ final class AppModel: ObservableObject {
         isCollectorHeartbeatFresh && settings.collectorOwnerID == collectorOwnerID
     }
 
+    var isCapturePaused: Bool {
+        settings.isCapturePaused(sessionID: collectorOwnerID)
+    }
+
     var isCollectorActiveElsewhere: Bool {
         isCollectorHeartbeatFresh &&
         settings.collectorOwnerID != nil &&
@@ -221,7 +227,7 @@ final class AppModel: ObservableObject {
     }
 
     var captureStatusLabel: String {
-        if settings.capturePaused {
+        if isCapturePaused {
             return isCollectorActiveElsewhere ? "Paused Elsewhere" : "Paused"
         }
         if isCollectorActiveElsewhere {
@@ -249,7 +255,82 @@ final class AppModel: ObservableObject {
            let owner = collectorOwnerDisplayName {
             return "Owned by \(owner)"
         }
+        if isCapturePaused,
+           let pauseDetail = capturePauseDetail {
+            return pauseDetail
+        }
         return activeProvider?.name ?? "No active provider"
+    }
+
+    var capturePauseDetail: String? {
+        guard isCapturePaused else {
+            return nil
+        }
+        if settings.capturePaused {
+            return "Paused until resumed"
+        }
+        if settings.isCapturePausedForCurrentSession(collectorOwnerID) {
+            return "Paused until next launch"
+        }
+        if let capturePauseUntil = settings.activeCapturePauseUntil() {
+            return "Resumes at \(capturePauseUntil.formatted(date: .omitted, time: .shortened))"
+        }
+        return "Paused until resumed"
+    }
+
+    var currentAppExclusionTitle: String {
+        guard let context = statusMenuContext else {
+            return "Exclude current app"
+        }
+        return "Exclude current app - \(context.appName)"
+    }
+
+    var currentDomainExclusionTitle: String {
+        guard let domain = statusMenuContext?.domain else {
+            return "Exclude current domain"
+        }
+        return "Exclude current domain - \(domain)"
+    }
+
+    var canExcludeCurrentApp: Bool {
+        guard let bundleID = statusMenuContext?.bundleID else {
+            return false
+        }
+        if let currentBundleID = Bundle.main.bundleIdentifier,
+           currentBundleID.caseInsensitiveCompare(bundleID) == .orderedSame {
+            return false
+        }
+        return hasExclusion(kind: .bundleID, pattern: bundleID) == false
+    }
+
+    var canExcludeCurrentDomain: Bool {
+        guard let domain = statusMenuContext?.domain else {
+            return false
+        }
+        return hasExclusion(kind: .domain, pattern: domain) == false
+    }
+
+    var menuVersionText: String? {
+        appVersion.map { "Openbird \($0)" }
+    }
+
+    var menuUpdateStatusText: String? {
+        guard appVersion != nil else {
+            return nil
+        }
+        if isInstallingUpdate {
+            return "Installing update..."
+        }
+        if let update = availableUpdate {
+            return "Update available - \(update.version)"
+        }
+        if isCheckingForUpdates {
+            return "Checking for updates..."
+        }
+        if updateStatusMessage.isEmpty == false {
+            return updateStatusMessage
+        }
+        return "No new update"
     }
 
     var availableChatModels: [ProviderModelInfo] {
@@ -340,7 +421,7 @@ final class AppModel: ObservableObject {
                 title: "Loading Openbird state",
                 detail: "Reading your saved settings, providers, and exclusions from the local store."
             )
-            settings = try await store.loadSettings()
+            settings = try await loadCurrentSettings()
             providerConfigs = try await store.loadProviderConfigs()
             exclusions = try await store.loadExclusions()
             if let selectedProvider {
@@ -498,23 +579,59 @@ final class AppModel: ObservableObject {
 
     func refreshCollectorState() async {
         do {
-            settings = try await store.loadSettings()
+            settings = try await loadCurrentSettings()
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
     func toggleCapturePaused() {
-        Task {
-            do {
-                var settings = try await store.loadSettings()
-                settings.capturePaused.toggle()
-                try await store.saveSettings(settings)
-                await refresh()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+        if isCapturePaused {
+            resumeCapture()
+            return
         }
+
+        persistCaptureSettings { settings in
+            settings.setManualCapturePaused(true)
+        }
+    }
+
+    func pauseCapture(for duration: TimeInterval) {
+        let pauseUntil = Date().addingTimeInterval(duration)
+        persistCaptureSettings { settings in
+            settings.pauseCapture(until: pauseUntil)
+        }
+    }
+
+    func pauseCaptureUntilNextLaunch() {
+        let currentSessionID = collectorOwnerID
+        persistCaptureSettings { settings in
+            settings.pauseCaptureForCurrentSession(currentSessionID)
+        }
+    }
+
+    func resumeCapture() {
+        persistCaptureSettings { settings in
+            settings.resumeCapture()
+        }
+    }
+
+    func refreshStatusMenuContext() {
+        statusMenuContext = currentActivityContextService.currentContext()
+    }
+
+    func excludeCurrentApp() {
+        guard let bundleID = statusMenuContext?.bundleID else {
+            return
+        }
+        addExclusion(kind: .bundleID, pattern: bundleID)
+    }
+
+    func excludeCurrentDomain() {
+        guard let domain = statusMenuContext?.domain else {
+            return
+        }
+        addExclusion(kind: .domain, pattern: domain)
     }
 
     func scheduleAutomaticProviderConnectionCheckIfNeeded() {
@@ -842,6 +959,33 @@ final class AppModel: ObservableObject {
 
     func installedApplication(for bundleID: String) -> InstalledApplication? {
         installedApplications.first { $0.bundleID.caseInsensitiveCompare(bundleID) == .orderedSame }
+    }
+
+    private func hasExclusion(kind: ExclusionKind, pattern: String) -> Bool {
+        exclusions.contains {
+            $0.kind == kind && $0.pattern.caseInsensitiveCompare(pattern) == .orderedSame
+        }
+    }
+
+    private func loadCurrentSettings() async throws -> AppSettings {
+        var settings = try await store.loadSettings()
+        if settings.normalizeCapturePause(sessionID: collectorOwnerID) {
+            try await store.saveSettings(settings)
+        }
+        return settings
+    }
+
+    private func persistCaptureSettings(_ update: @escaping (inout AppSettings) -> Void) {
+        Task {
+            do {
+                var settings = try await loadCurrentSettings()
+                update(&settings)
+                try await store.saveSettings(settings)
+                self.settings = settings
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
     }
 
     private func refreshInstalledApplications() {

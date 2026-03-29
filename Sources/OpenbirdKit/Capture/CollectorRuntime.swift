@@ -96,8 +96,11 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             }
             ownsLease = true
 
-            let settings = try await store.loadSettings()
-            if settings.capturePaused {
+            var settings = try await store.loadSettings()
+            if settings.normalizeCapturePause(now: now, sessionID: ownerID) {
+                try await store.saveSettings(settings)
+            }
+            if settings.isCapturePaused(now: now, sessionID: ownerID) {
                 currentEvent = nil
                 currentFingerprint = nil
                 _ = try await store.updateCollectorStatus(ownerID: ownerID, status: "paused", heartbeat: now)

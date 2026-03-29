@@ -86,14 +86,14 @@ private struct CaptureToolbarButton: View {
     @State private var isHovering = false
 
     private var isActivelyCapturing: Bool {
-        guard model.settings.capturePaused == false else { return false }
+        guard model.isCapturePaused == false else { return false }
         guard model.isCollectorActiveElsewhere == false else { return false }
         guard model.isCollectorHeartbeatFresh else { return false }
         return model.settings.collectorStatus == "running"
     }
 
     private var statusColor: Color {
-        if model.settings.capturePaused { return .orange }
+        if model.isCapturePaused { return .orange }
         if model.isCollectorActiveElsewhere { return .secondary }
         if model.isCollectorHeartbeatFresh == false { return .secondary }
         switch model.settings.collectorStatus {
@@ -107,7 +107,7 @@ private struct CaptureToolbarButton: View {
     }
 
     private var actionTitle: String {
-        model.settings.capturePaused ? "Resume" : "Pause"
+        model.isCapturePaused ? "Resume" : "Pause"
     }
 
     private var buttonTitle: String {
@@ -115,11 +115,11 @@ private struct CaptureToolbarButton: View {
     }
 
     private var hoverSymbolName: String {
-        model.settings.capturePaused ? "play.fill" : "pause.fill"
+        model.isCapturePaused ? "play.fill" : "pause.fill"
     }
 
     private var statusSymbolName: String {
-        if model.settings.capturePaused { return "pause.fill" }
+        if model.isCapturePaused { return "pause.fill" }
         if model.isCollectorActiveElsewhere { return "desktopcomputer" }
         if model.isCollectorHeartbeatFresh == false { return "stop.fill" }
         switch model.settings.collectorStatus {
