@@ -291,7 +291,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try execute("DELETE FROM exclusions WHERE id = ?;", bindings: [.text(id)])
     }
 
-    public func saveActivityEvent(_ event: ActivityEvent) throws {
+    public func saveActivityEvent(_ event: ActivityEvent) throws -> ActivityEvent {
         try withImmediateTransaction {
             let overlappingDuplicates = try query(
                 """
@@ -350,6 +350,8 @@ public final class SQLiteDatabase: @unchecked Sendable {
                     .text(mergedEvent.visibleText),
                 ]
             )
+
+            return mergedEvent
         }
     }
 
@@ -538,6 +540,51 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
     }
 
+    public func loadPreparedActivityEvents(for day: String) throws -> [GroupedActivityEvent]? {
+        guard let row = try query(
+            "SELECT grouped_events_json FROM prepared_activity_days WHERE day = ? LIMIT 1;",
+            bindings: [.text(day)]
+        ).first,
+        let payload = row.optionalStringValue(for: "grouped_events_json")
+        else {
+            return nil
+        }
+
+        return try decode([GroupedActivityEvent].self, from: payload)
+    }
+
+    public func savePreparedActivityEvents(_ events: [GroupedActivityEvent], for day: String) throws {
+        let payload = try encode(events)
+        try execute(
+            """
+            INSERT INTO prepared_activity_days (day, grouped_events_json, updated_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(day) DO UPDATE
+            SET grouped_events_json = excluded.grouped_events_json,
+                updated_at = excluded.updated_at;
+            """,
+            bindings: [
+                .text(day),
+                .text(payload),
+                .double(Date().timeIntervalSince1970),
+            ]
+        )
+    }
+
+    public func deletePreparedActivityEvents(for days: Set<String>) throws {
+        guard days.isEmpty == false else {
+            return
+        }
+
+        let placeholders = Array(repeating: "?", count: days.count).joined(separator: ",")
+        let sql = "DELETE FROM prepared_activity_days WHERE day IN (\(placeholders));"
+        try execute(sql, bindings: days.sorted().map(SQLiteValue.text))
+    }
+
+    public func deleteAllPreparedActivityEvents() throws {
+        try execute("DELETE FROM prepared_activity_days;")
+    }
+
     private func migrate() throws {
         let statements = [
             """
@@ -633,6 +680,13 @@ public final class SQLiteDatabase: @unchecked Sendable {
                 vector_json TEXT NOT NULL,
                 snippet TEXT NOT NULL,
                 created_at REAL NOT NULL
+            );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS prepared_activity_days (
+                day TEXT PRIMARY KEY,
+                grouped_events_json TEXT NOT NULL,
+                updated_at REAL NOT NULL
             );
             """,
         ]

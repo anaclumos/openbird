@@ -33,6 +33,10 @@ public enum OpenbirdDateFormatting {
         dayFormatter.string(from: date)
     }
 
+    public static func date(fromDayString value: String) -> Date? {
+        dayFormatter.date(from: value)
+    }
+
     public static func timeString(for date: Date) -> String {
         timeFormatter.string(from: date)
     }

@@ -1,6 +1,6 @@
 import Foundation
 
-public struct GroupedActivityEvent: Identifiable, Hashable, Sendable {
+public struct GroupedActivityEvent: Identifiable, Codable, Hashable, Sendable {
     public let id: String
     public let startedAt: Date
     public let endedAt: Date
@@ -10,7 +10,7 @@ public struct GroupedActivityEvent: Identifiable, Hashable, Sendable {
     public let url: String?
     public let excerpt: String
     public let isExcluded: Bool
-    public let sourceEvents: [ActivityEvent]
+    public let sourceEventIDs: [String]
 
     public init(
         id: String,
@@ -22,7 +22,7 @@ public struct GroupedActivityEvent: Identifiable, Hashable, Sendable {
         url: String?,
         excerpt: String,
         isExcluded: Bool,
-        sourceEvents: [ActivityEvent]
+        sourceEventIDs: [String]
     ) {
         self.id = id
         self.startedAt = startedAt
@@ -33,19 +33,15 @@ public struct GroupedActivityEvent: Identifiable, Hashable, Sendable {
         self.url = url
         self.excerpt = excerpt
         self.isExcluded = isExcluded
-        self.sourceEvents = sourceEvents
+        self.sourceEventIDs = sourceEventIDs
+    }
+
+    public var sourceEventCount: Int {
+        sourceEventIDs.count
     }
 
     public var displayTitle: String {
         detailTitle ?? appName
-    }
-
-    public var sourceEventIDs: [String] {
-        sourceEvents.map(\.id)
-    }
-
-    public var sourceEventCount: Int {
-        sourceEvents.count
     }
 }
 
@@ -233,7 +229,7 @@ public enum ActivityEvidencePreprocessor {
 
         var startedAt: Date
         var endedAt: Date
-        var sourceEvents: [ActivityEvent]
+        var sourceEventIDs: [String]
         var sourceEventHashes: Set<String>
         var descriptors: DescriptorComponents
 
@@ -245,7 +241,7 @@ public enum ActivityEvidencePreprocessor {
             isExcluded = event.isExcluded
             startedAt = event.startedAt
             endedAt = event.endedAt
-            sourceEvents = [event]
+            sourceEventIDs = [event.id]
             sourceEventHashes = [event.contentHash]
             descriptors = preparedEvent.descriptors
         }
@@ -284,7 +280,7 @@ public enum ActivityEvidencePreprocessor {
             let event = preparedEvent.event
             startedAt = min(startedAt, event.startedAt)
             endedAt = max(endedAt, event.endedAt)
-            sourceEvents.append(event)
+            sourceEventIDs.append(event.id)
             sourceEventHashes.insert(event.contentHash)
 
             var mergedDescriptors = DescriptorAccumulator(components: descriptors)
@@ -303,7 +299,7 @@ public enum ActivityEvidencePreprocessor {
                 url: descriptors.preferredURL,
                 excerpt: descriptors.displayExcerpt,
                 isExcluded: isExcluded,
-                sourceEvents: sourceEvents
+                sourceEventIDs: sourceEventIDs
             )
         }
     }

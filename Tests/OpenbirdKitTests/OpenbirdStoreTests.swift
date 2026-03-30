@@ -113,6 +113,107 @@ struct OpenbirdStoreTests {
         #expect(events.first?.source == "accessibility")
     }
 
+    @Test func preparedActivityEventsGroupNoisyAccessibilityLogs() async throws {
+        let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
+        let store = try OpenbirdStore(databaseURL: databaseURL)
+        let start = Date(timeIntervalSince1970: 1_720_000_000)
+
+        let events = [
+            ActivityEvent(
+                startedAt: start,
+                endedAt: start.addingTimeInterval(30),
+                bundleId: "com.kakao.KakaoTalkMac",
+                appName: "KakaoTalk",
+                windowTitle: "Alice",
+                url: nil,
+                visibleText: "Alice Profile 9:31 PM See you there Enter a message Search Voice Call Video Call Menu",
+                source: "accessibility",
+                contentHash: "chat-a",
+                isExcluded: false
+            ),
+            ActivityEvent(
+                startedAt: start.addingTimeInterval(31),
+                endedAt: start.addingTimeInterval(60),
+                bundleId: "com.kakao.KakaoTalkMac",
+                appName: "KakaoTalk",
+                windowTitle: "Alice",
+                url: nil,
+                visibleText: "Alice 9:39 PM See you there tomorrow Enter a message Search Menu",
+                source: "accessibility",
+                contentHash: "chat-b",
+                isExcluded: false
+            ),
+            ActivityEvent(
+                startedAt: start.addingTimeInterval(90),
+                endedAt: start.addingTimeInterval(180),
+                bundleId: "com.kakao.KakaoTalkMac",
+                appName: "KakaoTalk",
+                windowTitle: "Alice",
+                url: nil,
+                visibleText: "Alice 10:23 PM Shared the pickup plan",
+                source: "accessibility",
+                contentHash: "chat-c",
+                isExcluded: false
+            ),
+        ]
+
+        for event in events {
+            try await store.saveActivityEvent(event)
+        }
+
+        let grouped = try await store.preparedActivityEvents(for: start)
+
+        #expect(grouped.count == 1)
+        #expect(grouped.first?.sourceEventIDs.count == 3)
+        #expect(grouped.first?.sourceEventCount == 3)
+        #expect(grouped.first?.excerpt.contains("Enter a message") == false)
+        #expect(grouped.first?.excerpt.contains("Voice Call") == false)
+    }
+
+    @Test func preparedActivityEventsRefreshWhenNewLogsArrive() async throws {
+        let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
+        let store = try OpenbirdStore(databaseURL: databaseURL)
+        let start = Date(timeIntervalSince1970: 1_720_000_000)
+
+        try await store.saveActivityEvent(
+            ActivityEvent(
+                startedAt: start,
+                endedAt: start.addingTimeInterval(30),
+                bundleId: "com.kakao.KakaoTalkMac",
+                appName: "KakaoTalk",
+                windowTitle: "Alice",
+                url: nil,
+                visibleText: "Alice See you there",
+                source: "accessibility",
+                contentHash: "chat-a",
+                isExcluded: false
+            )
+        )
+
+        let initial = try await store.preparedActivityEvents(for: start)
+        #expect(initial.count == 1)
+        #expect(initial.first?.sourceEventCount == 1)
+
+        try await store.saveActivityEvent(
+            ActivityEvent(
+                startedAt: start.addingTimeInterval(31),
+                endedAt: start.addingTimeInterval(60),
+                bundleId: "com.kakao.KakaoTalkMac",
+                appName: "KakaoTalk",
+                windowTitle: "Alice",
+                url: nil,
+                visibleText: "Alice Shared the pickup plan",
+                source: "accessibility",
+                contentHash: "chat-b",
+                isExcluded: false
+            )
+        )
+
+        let refreshed = try await store.preparedActivityEvents(for: start)
+        #expect(refreshed.count == 1)
+        #expect(refreshed.first?.sourceEventCount == 2)
+    }
+
     @Test func collectorLeaseBlocksSecondOwnerUntilHeartbeatExpires() async throws {
         let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
         let store = try OpenbirdStore(databaseURL: databaseURL)

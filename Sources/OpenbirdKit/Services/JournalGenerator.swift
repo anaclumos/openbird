@@ -27,17 +27,16 @@ public actor JournalGenerator {
 
     public func generate(request: JournalGenerationRequest) async throws -> DailyJournal {
         let day = OpenbirdDateFormatting.dayString(for: request.date)
-        let dayRange = Calendar.current.dayRange(for: request.date)
-        let events = try await store.loadActivityEvents(in: dayRange)
         let groupedEvents = Array(
-            ActivityEvidencePreprocessor.groupedMeaningfulEvents(from: events)
+            try await store.preparedActivityEvents(for: request.date)
+                .filter { $0.isExcluded == false }
                 .prefix(request.maxSourceEvents)
         )
         let preparedSections = buildSections(from: groupedEvents)
         let sections = preparedSections.map(\.journalSection)
         let heuristicMarkdown = renderMarkdown(for: request.date, sections: preparedSections)
         logger.notice(
-            "Generating journal for \(day, privacy: .public); events=\(events.count, privacy: .public) sections=\(preparedSections.count, privacy: .public)"
+            "Generating journal for \(day, privacy: .public); groupedEvents=\(groupedEvents.count, privacy: .public) sections=\(preparedSections.count, privacy: .public)"
         )
 
         let providerConfig = try await activeProviderIfAvailable(id: request.providerID)

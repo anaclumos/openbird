@@ -453,6 +453,7 @@ final class AppModel: ObservableObject {
                 detail: "Querying the local timeline database for raw events recorded on the selected day."
             )
             let loadedRawEvents = try await store.loadActivityEvents(in: dayRange, includeExcluded: true)
+            await store.prepareActivityEventsInBackground(for: requestedDay)
             dayLoadStatus = Self.makeDayLoadStatus(
                 step: 3,
                 totalSteps: 5,
