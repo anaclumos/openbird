@@ -10,7 +10,7 @@ public enum SQLiteValue: Sendable {
     case null
 }
 
-public enum SQLiteError: Error, CustomStringConvertible {
+public enum SQLiteError: Error, CustomStringConvertible, LocalizedError {
     case open(String)
     case prepare(String)
     case step(String)
@@ -26,6 +26,10 @@ public enum SQLiteError: Error, CustomStringConvertible {
              .generic(let message):
             return message
         }
+    }
+
+    public var errorDescription: String? {
+        description
     }
 }
 
@@ -43,6 +47,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
             throw SQLiteError.open("Failed to open database at \(url.path)")
         }
         self.handle = db!
+        sqlite3_busy_timeout(handle, 5_000)
         try execute("PRAGMA journal_mode=WAL;")
         try execute("PRAGMA foreign_keys=ON;")
         try migrate()

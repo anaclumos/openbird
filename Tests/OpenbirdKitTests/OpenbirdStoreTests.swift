@@ -1,8 +1,13 @@
 import Foundation
+import CSQLite
 import Testing
 @testable import OpenbirdKit
 
 struct OpenbirdStoreTests {
+    private struct LockConnection: @unchecked Sendable {
+        let handle: OpaquePointer
+    }
+
     @Test func savesAndSearchesActivityEvents() async throws {
         let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
         let store = try OpenbirdStore(databaseURL: databaseURL)
@@ -214,5 +219,46 @@ struct OpenbirdStoreTests {
         #expect(smallModelChunks.count == 1)
         #expect(smallModelChunks.first?.eventID == "event-1")
         #expect(smallModelChunks.first?.snippet == "first")
+    }
+
+    @Test func surfacesSQLiteMessagesThroughLocalizedDescription() {
+        let error = SQLiteError.step("database is locked")
+        #expect(error.localizedDescription == "database is locked")
+    }
+
+    @Test func waitsForTransientWriteLocksBeforeSavingJournal() async throws {
+        let databaseURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("sqlite")
+        let store = try OpenbirdStore(databaseURL: databaseURL)
+
+        var lockHandle: OpaquePointer?
+        #expect(sqlite3_open_v2(databaseURL.path, &lockHandle, SQLITE_OPEN_CREATE | SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX, nil) == SQLITE_OK)
+        guard let lockHandle else {
+            Issue.record("Failed to open lock connection")
+            return
+        }
+        let lockConnection = LockConnection(handle: lockHandle)
+
+        #expect(sqlite3_exec(lockConnection.handle, "PRAGMA journal_mode=WAL;", nil, nil, nil) == SQLITE_OK)
+        #expect(sqlite3_exec(lockConnection.handle, "BEGIN IMMEDIATE TRANSACTION;", nil, nil, nil) == SQLITE_OK)
+
+        let unlockTask = Task.detached {
+            try? await Task.sleep(for: .milliseconds(150))
+            sqlite3_exec(lockConnection.handle, "COMMIT;", nil, nil, nil)
+        }
+
+        let journal = DailyJournal(
+            day: OpenbirdDateFormatting.dayString(for: Date()),
+            markdown: "Summary",
+            sections: [],
+            providerID: nil
+        )
+        try await store.saveJournal(journal)
+        _ = await unlockTask.value
+        sqlite3_close(lockConnection.handle)
+
+        let reloaded = try await store.loadJournal(for: journal.day)
+        #expect(reloaded?.markdown == "Summary")
     }
 }
