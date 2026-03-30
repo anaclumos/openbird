@@ -27,10 +27,10 @@ public actor JournalGenerator {
 
     public func generate(request: JournalGenerationRequest) async throws -> DailyJournal {
         let day = OpenbirdDateFormatting.dayString(for: request.date)
-        let groupedEvents = Array(
-            try await store.preparedActivityEvents(for: request.date)
-                .filter { $0.isExcluded == false }
-                .prefix(request.maxSourceEvents)
+        let groupedEvents = boundedSourceEvents(
+            from: try await store.preparedActivityEvents(for: request.date)
+                .filter { $0.isExcluded == false },
+            limit: request.maxSourceEvents
         )
         let preparedSections = buildSections(from: groupedEvents)
         let sections = preparedSections.map(\.journalSection)
@@ -85,6 +85,30 @@ public actor JournalGenerator {
         let settings = try await store.loadSettings()
         let configs = try await store.loadProviderConfigs()
         return ProviderSelection.resolve(configs: configs, settings: settings, preferredID: id)
+    }
+
+    private func boundedSourceEvents(
+        from events: [GroupedActivityEvent],
+        limit: Int
+    ) -> [GroupedActivityEvent] {
+        guard limit > 0 else {
+            return []
+        }
+
+        guard events.count > limit else {
+            return events
+        }
+
+        guard limit > 1 else {
+            return Array(events.suffix(1))
+        }
+
+        let openingContextCount = max(1, limit / 4)
+        let recentActivityCount = limit - openingContextCount
+        let recentActivityStartIndex = max(openingContextCount, events.count - recentActivityCount)
+
+        return Array(events.prefix(openingContextCount))
+            + Array(events.suffix(from: recentActivityStartIndex))
     }
 
     private func buildSections(from events: [GroupedActivityEvent]) -> [PreparedSection] {

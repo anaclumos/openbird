@@ -369,4 +369,42 @@ struct JournalGeneratorTests {
         #expect(journal.markdown.contains("## Alice"))
         #expect(journal.markdown.contains("- See you there"))
     }
+
+    @Test func prioritizesRecentActivityWhenSourceEventsAreCapped() async throws {
+        let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
+        let store = try OpenbirdStore(databaseURL: databaseURL)
+        let generator = JournalGenerator(store: store)
+
+        let start = Calendar.current.startOfDay(for: Date()).addingTimeInterval(8 * 3600)
+        let events = (0..<6).map { index in
+            let eventStart = start.addingTimeInterval(TimeInterval(index * 3600))
+            return ActivityEvent(
+                startedAt: eventStart,
+                endedAt: eventStart.addingTimeInterval(300),
+                bundleId: "com.apple.Safari",
+                appName: "Safari",
+                windowTitle: "Window \(index + 1)",
+                url: "https://example.com/\(index + 1)",
+                visibleText: "Checked window \(index + 1)",
+                source: "accessibility",
+                contentHash: "event-\(index + 1)",
+                isExcluded: false
+            )
+        }
+
+        for event in events {
+            try await store.saveActivityEvent(event)
+        }
+
+        let journal = try await generator.generate(
+            request: JournalGenerationRequest(
+                date: start,
+                maxSourceEvents: 4,
+                providerID: nil
+            )
+        )
+
+        let headings = journal.sections.map(\.heading)
+        #expect(headings == ["Window 1", "Window 4", "Window 5", "Window 6"])
+    }
 }
