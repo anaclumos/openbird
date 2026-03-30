@@ -1,10 +1,12 @@
 import AppKit
 import Foundation
 import OpenbirdKit
+import OSLog
 
 actor AppUpdater {
     private let session: URLSession
     private let fileManager: FileManager
+    private let logger = OpenbirdLog.updates
 
     init(
         session: URLSession = .shared,
@@ -18,6 +20,7 @@ actor AppUpdater {
         guard appBundleURL.pathExtension == "app" else {
             throw AppUpdaterError.unavailableForDevelopmentBuilds
         }
+        logger.notice("Starting update install for \(update.version, privacy: .public)")
 
         let (downloadedFileURL, _) = try await session.download(from: update.downloadURL)
         let diskImageURL = try moveDownloadToTemporaryDiskImage(downloadedFileURL)
@@ -36,6 +39,9 @@ actor AppUpdater {
             mountPointURL: mountPointURL,
             diskImageURL: diskImageURL,
             requiresAdministratorPrivileges: requiresAdministratorPrivileges
+        )
+        logger.notice(
+            "Launched update installer for \(update.version, privacy: .public) adminPrivileges=\(requiresAdministratorPrivileges, privacy: .public)"
         )
     }
 

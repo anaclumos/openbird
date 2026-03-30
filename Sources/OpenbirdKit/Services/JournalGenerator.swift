@@ -1,7 +1,9 @@
 import Foundation
+import OSLog
 
 public actor JournalGenerator {
     private let store: OpenbirdStore
+    private let logger = OpenbirdLog.journal
 
     private struct PreparedSection {
         let heading: String
@@ -24,6 +26,7 @@ public actor JournalGenerator {
     }
 
     public func generate(request: JournalGenerationRequest) async throws -> DailyJournal {
+        let day = OpenbirdDateFormatting.dayString(for: request.date)
         let dayRange = Calendar.current.dayRange(for: request.date)
         let events = try await store.loadActivityEvents(in: dayRange)
         let groupedEvents = Array(
@@ -33,6 +36,9 @@ public actor JournalGenerator {
         let preparedSections = buildSections(from: groupedEvents)
         let sections = preparedSections.map(\.journalSection)
         let heuristicMarkdown = renderMarkdown(for: request.date, sections: preparedSections)
+        logger.notice(
+            "Generating journal for \(day, privacy: .public); events=\(events.count, privacy: .public) sections=\(preparedSections.count, privacy: .public)"
+        )
 
         let providerConfig = try await activeProviderIfAvailable(id: request.providerID)
         let markdown: String
@@ -52,21 +58,27 @@ public actor JournalGenerator {
                     )
                 )
                 markdown = response.content.isEmpty ? heuristicMarkdown : response.content
+                logger.notice("Generated journal with provider kind=\(providerConfig.kind.rawValue, privacy: .public)")
             } catch {
+                logger.error(
+                    "Provider journal generation failed; using heuristic journal. kind=\(providerConfig.kind.rawValue, privacy: .public) error=\(OpenbirdLog.errorDescription(error), privacy: .public)"
+                )
                 markdown = heuristicMarkdown
             }
         } else {
+            logger.notice("No active provider configured; using heuristic journal")
             markdown = heuristicMarkdown
         }
 
         let journal = DailyJournal(
-            day: OpenbirdDateFormatting.dayString(for: request.date),
+            day: day,
             markdown: markdown,
             sections: sections,
             providerID: providerConfig?.id,
             updatedAt: Date()
         )
         try await store.saveJournal(journal)
+        logger.notice("Saved journal for \(day, privacy: .public)")
         return journal
     }
 

@@ -1,9 +1,11 @@
 import Foundation
+import OSLog
 
 public struct OllamaProvider: LLMProvider {
     public let config: ProviderConfig
     private let session: URLSession
     private let normalizedBaseURL: URL
+    private let logger = OpenbirdLog.providers
 
     public init(config: ProviderConfig, session: URLSession = .shared) {
         self.config = config
@@ -53,9 +55,21 @@ public struct OllamaProvider: LLMProvider {
         if let bodyData {
             request.httpBody = bodyData
         }
+        logger.debug(
+            "Ollama request started method=\(method, privacy: .public) path=\(path, privacy: .public)"
+        )
         let (data, response) = try await session.data(for: request)
-        try validate(response: response, data: data)
-        return try JSONDecoder().decode(Response.self, from: data)
+        try validate(response: response, data: data, path: path)
+        do {
+            let decoded = try JSONDecoder().decode(Response.self, from: data)
+            logger.debug("Ollama request finished method=\(method, privacy: .public) path=\(path, privacy: .public)")
+            return decoded
+        } catch {
+            logger.error(
+                "Ollama response decode failed path=\(path, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)"
+            )
+            throw error
+        }
     }
 
     private func performRequest<Response: Decodable, Body: Encodable>(
@@ -66,9 +80,11 @@ public struct OllamaProvider: LLMProvider {
         try await performRequest(path: path, method: method, bodyData: try JSONEncoder().encode(body))
     }
 
-    private func validate(response: URLResponse, data: Data) throws {
+    private func validate(response: URLResponse, data: Data, path: String) throws {
         guard let httpResponse = response as? HTTPURLResponse,
               200..<300 ~= httpResponse.statusCode else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            logger.error("Ollama request failed path=\(path, privacy: .public) status=\(statusCode, privacy: .public)")
             let message = String(data: data, encoding: .utf8) ?? "Request failed"
             throw NSError(domain: "OllamaProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
         }

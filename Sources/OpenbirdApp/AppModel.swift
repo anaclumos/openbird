@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import OpenbirdKit
+import OSLog
 
 @MainActor
 final class AppModel: ObservableObject {
@@ -100,6 +101,7 @@ final class AppModel: ObservableObject {
     private var providerConnectionRequestID = UUID()
     private var updateCheckRequestID = UUID()
     private var isShuttingDown = false
+    private let logger = OpenbirdLog.app
 
     init(
         userDefaults: UserDefaults = .standard,
@@ -126,7 +128,9 @@ final class AppModel: ObservableObject {
                 ownerID: collectorOwnerID,
                 ownerName: collectorOwnerName
             )
+            logger.notice("Initialized Openbird state")
         } catch {
+            logger.critical("Failed to initialize Openbird store: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             fatalError("Failed to initialize Openbird store: \(error)")
         }
 
@@ -388,6 +392,7 @@ final class AppModel: ObservableObject {
         }
 
         isShuttingDown = true
+        logger.notice("Preparing app model for shutdown")
         initialRefreshTask?.cancel()
         chatSendTask?.cancel()
         providerConnectionTask?.cancel()
@@ -401,6 +406,9 @@ final class AppModel: ObservableObject {
             return
         }
 
+        let requestedDay = selectedDay
+        let requestedDayString = OpenbirdDateFormatting.dayString(for: requestedDay)
+        logger.notice("Refreshing app state for \(requestedDayString, privacy: .public)")
         chatSendTask?.cancel()
         clearTransientChatState()
         refreshAccessibilityPermissionState()
@@ -411,7 +419,6 @@ final class AppModel: ObservableObject {
         }
 
         do {
-            let requestedDay = selectedDay
             let previousProviderID = editingProvider.id
             rawEvents = []
             todayJournal = nil
@@ -494,7 +501,11 @@ final class AppModel: ObservableObject {
             todayJournal = loadedJournal
             chatThread = thread
             chatMessages = loadedChatMessages
+            logger.notice(
+                "Refresh completed for \(day, privacy: .public); events=\(loadedRawEvents.count, privacy: .public) journalLoaded=\((loadedJournal != nil), privacy: .public) chatMessages=\(loadedChatMessages.count, privacy: .public)"
+            )
         } catch {
+            logger.error("Refresh failed for \(requestedDayString, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)")
             errorMessage = error.localizedDescription
         }
     }
@@ -546,6 +557,7 @@ final class AppModel: ObservableObject {
         clearTransientChatState()
 
         let day = OpenbirdDateFormatting.dayString(for: selectedDay)
+        logger.notice("Starting a new chat for \(day, privacy: .public)")
         Task { [weak self] in
             guard let self else {
                 return
@@ -561,7 +573,9 @@ final class AppModel: ObservableObject {
                 chatMessages = []
                 chatInput = ""
                 shouldFocusChatComposer = true
+                logger.notice("Started new chat thread for \(day, privacy: .public)")
             } catch {
+                logger.error("Failed to start a new chat for \(day, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -585,6 +599,7 @@ final class AppModel: ObservableObject {
 
         isInstallingUpdate = true
         updateStatusMessage = "Installing Openbird \(availableUpdate.version)…"
+        logger.notice("Installing Openbird update \(availableUpdate.version, privacy: .public)")
 
         Task { [weak self] in
             guard let self else {
@@ -598,6 +613,7 @@ final class AppModel: ObservableObject {
                 )
                 quitApplication()
             } catch {
+                logger.error("Failed to install Openbird update \(availableUpdate.version, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 isInstallingUpdate = false
                 updateStatusMessage = "Openbird \(availableUpdate.version) is available."
                 errorMessage = "Failed to update Openbird: \(error.localizedDescription)"
@@ -609,6 +625,7 @@ final class AppModel: ObservableObject {
         do {
             settings = try await loadCurrentSettings()
         } catch {
+            logger.error("Failed to refresh collector state: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             errorMessage = error.localizedDescription
         }
     }
@@ -626,6 +643,7 @@ final class AppModel: ObservableObject {
 
     func pauseCapture(for duration: TimeInterval) {
         let pauseUntil = Date().addingTimeInterval(duration)
+        logger.notice("Pausing capture for \(Int(duration), privacy: .public) seconds")
         persistCaptureSettings { settings in
             settings.pauseCapture(until: pauseUntil)
         }
@@ -633,12 +651,14 @@ final class AppModel: ObservableObject {
 
     func pauseCaptureUntilNextLaunch() {
         let currentSessionID = collectorOwnerID
+        logger.notice("Pausing capture until next launch")
         persistCaptureSettings { settings in
             settings.pauseCaptureForCurrentSession(currentSessionID)
         }
     }
 
     func resumeCapture() {
+        logger.notice("Resuming capture")
         persistCaptureSettings { settings in
             settings.resumeCapture()
         }
@@ -759,7 +779,13 @@ final class AppModel: ObservableObject {
             if let statusMessage {
                 providerStatusMessage = statusMessage
             }
+            logger.notice(
+                "Saved provider configuration kind=\(savedProvider.kind.rawValue, privacy: .public) activated=\(activate, privacy: .public)"
+            )
         } catch {
+            logger.error(
+                "Failed to save provider configuration kind=\(provider.kind.rawValue, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)"
+            )
             errorMessage = error.localizedDescription
         }
 
@@ -775,6 +801,7 @@ final class AppModel: ObservableObject {
         }
 
         providerStatusMessage = "Checking \(config.name)…"
+        logger.notice("Checking provider connection kind=\(config.kind.rawValue, privacy: .public)")
 
         do {
             let provider = ProviderFactory.makeProvider(for: config)
@@ -810,6 +837,9 @@ final class AppModel: ObservableObject {
             } else {
                 providerStatusMessage = connectionSuccessMessage(models: models, kind: updated.kind, saved: false)
             }
+            logger.notice(
+                "Provider connection succeeded kind=\(config.kind.rawValue, privacy: .public) models=\(models.count, privacy: .public)"
+            )
         } catch is CancellationError {
             return
         } catch {
@@ -817,6 +847,9 @@ final class AppModel: ObservableObject {
                 return
             }
             providerStatusMessage = "Connection failed: \(error.localizedDescription)"
+            logger.error(
+                "Provider connection failed kind=\(config.kind.rawValue, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)"
+            )
         }
 
         providerConnectionTask = nil
@@ -960,11 +993,13 @@ final class AppModel: ObservableObject {
                 } else if showUpToDateMessage {
                     updateStatusMessage = "Openbird \(update.version) is available."
                 }
+                logger.notice("Update available: \(update.version, privacy: .public)")
             } else {
                 availableUpdate = nil
                 if showUpToDateMessage {
                     updateStatusMessage = "Openbird is up to date."
                 }
+                logger.notice("Openbird is up to date")
             }
         } catch is CancellationError {
             return
@@ -972,6 +1007,7 @@ final class AppModel: ObservableObject {
             guard updateCheckRequestID == requestID else {
                 return
             }
+            logger.error("Failed to check for updates: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             if showUpToDateMessage {
                 errorMessage = "Failed to check for updates: \(error.localizedDescription)"
             }
@@ -1034,7 +1070,11 @@ final class AppModel: ObservableObject {
                 update(&settings)
                 try await store.saveSettings(settings)
                 self.settings = settings
+                logger.notice(
+                    "Persisted capture settings paused=\(settings.isCapturePaused(sessionID: self.collectorOwnerID), privacy: .public)"
+                )
             } catch {
+                logger.error("Failed to persist capture settings: \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -1066,8 +1106,10 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 try await store.saveExclusion(ExclusionRule(kind: kind, pattern: trimmed))
+                logger.notice("Added exclusion kind=\(kind.rawValue, privacy: .public)")
                 await refresh()
             } catch {
+                logger.error("Failed to add exclusion kind=\(kind.rawValue, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -1077,8 +1119,10 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 try await store.deleteExclusion(id: id)
+                logger.notice("Removed exclusion")
                 await refresh()
             } catch {
+                logger.error("Failed to remove exclusion: \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -1090,8 +1134,10 @@ final class AppModel: ObservableObject {
                 var settings = try await store.loadSettings()
                 settings.retentionDays = days
                 try await store.saveSettings(settings)
+                logger.notice("Updated retention days to \(days, privacy: .public)")
                 await refresh()
             } catch {
+                logger.error("Failed to update retention days: \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -1101,8 +1147,10 @@ final class AppModel: ObservableObject {
         Task {
             do {
                 try await retentionService.delete(scope: scope)
+                logger.notice("Deleted data scope=\(String(describing: scope), privacy: .public)")
                 await refresh()
             } catch {
+                logger.error("Failed to delete data: \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -1114,8 +1162,10 @@ final class AppModel: ObservableObject {
         }
 
         isGeneratingTodayJournal = true
+        let requestedDay = selectedDay
+        let requestedDayString = OpenbirdDateFormatting.dayString(for: requestedDay)
+        logger.notice("Generating journal for \(requestedDayString, privacy: .public)")
         Task {
-            let requestedDay = selectedDay
             defer { isGeneratingTodayJournal = false }
             do {
                 let journal = try await generateJournal(for: requestedDay)
@@ -1123,7 +1173,9 @@ final class AppModel: ObservableObject {
                     return
                 }
                 todayJournal = journal
+                logger.notice("Generated journal for \(requestedDayString, privacy: .public)")
             } catch {
+                logger.error("Failed to generate journal for \(requestedDayString, privacy: .public): \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
         }
@@ -1139,6 +1191,7 @@ final class AppModel: ObservableObject {
         pendingUserChatMessage = userMessage
         pendingAssistantReply = PendingAssistantReply(message: assistantPlaceholder, state: .thinking)
         isSendingChat = true
+        logger.notice("Sending chat message length=\(question.count, privacy: .public)")
 
         chatSendTask?.cancel()
         chatSendTask = Task { [weak self] in
@@ -1168,6 +1221,7 @@ final class AppModel: ObservableObject {
                     chatInput = question
                 }
                 clearTransientChatState()
+                logger.error("Failed to answer chat: \(OpenbirdLog.errorDescription(error), privacy: .public)")
                 errorMessage = error.localizedDescription
             }
 
@@ -1227,7 +1281,9 @@ final class AppModel: ObservableObject {
 
         do {
             chatMessages = try await store.loadMessages(threadID: threadID)
+            logger.notice("Loaded persisted chat messages for thread \(threadID, privacy: .public)")
         } catch {
+            logger.error("Failed to load streamed chat messages: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             errorMessage = error.localizedDescription
         }
 

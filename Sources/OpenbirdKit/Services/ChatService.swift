@@ -1,8 +1,10 @@
 import Foundation
+import OSLog
 
 public actor ChatService {
     private let store: OpenbirdStore
     private let retrievalService: RetrievalService
+    private let logger = OpenbirdLog.chat
 
     public init(store: OpenbirdStore, retrievalService: RetrievalService) {
         self.store = store
@@ -13,6 +15,7 @@ public actor ChatService {
     public func createThread(for day: String) async throws -> ChatThread {
         let thread = ChatThread(title: "Chat for \(day)", startDay: day)
         try await store.saveThread(thread)
+        logger.notice("Created chat thread for \(day, privacy: .public)")
         return thread
     }
 
@@ -20,12 +23,14 @@ public actor ChatService {
     public func ensureThread(for day: String) async throws -> ChatThread {
         let threads = try await store.loadThreads()
         if let existing = threads.first(where: { $0.startDay == day }) {
+            logger.debug("Reused existing chat thread for \(day, privacy: .public)")
             return existing
         }
         return try await createThread(for: day)
     }
 
     public func answer(_ query: ChatQuery) async throws -> ChatMessage {
+        logger.notice("Answering chat query with topK=\(query.topK, privacy: .public)")
         let settings = try await store.loadSettings()
         let providerConfigs = try await store.loadProviderConfigs()
         let providerConfig = ProviderSelection.resolve(
@@ -39,6 +44,7 @@ public actor ChatService {
             topK: query.topK,
             providerConfig: providerConfig
         )
+        logger.notice("Retrieved \(relevantEvents.count, privacy: .public) events for chat answer")
 
         let citations = relevantEvents.map {
             Citation(
@@ -84,10 +90,17 @@ public actor ChatService {
                     )
                 )
                 answerText = response.content
+                logger.notice(
+                    "Answered chat with provider kind=\(providerConfig.kind.rawValue, privacy: .public) evidenceCount=\(relevantEvents.count, privacy: .public)"
+                )
             } catch {
+                logger.error(
+                    "Provider chat failed; using heuristic answer. kind=\(providerConfig.kind.rawValue, privacy: .public) error=\(OpenbirdLog.errorDescription(error), privacy: .public)"
+                )
                 answerText = heuristicAnswer(for: query.question, events: relevantEvents)
             }
         } else {
+            logger.notice("No active provider configured; using heuristic chat answer")
             answerText = heuristicAnswer(for: query.question, events: relevantEvents)
         }
 
@@ -106,6 +119,7 @@ public actor ChatService {
         )
         try await store.saveMessage(userMessage)
         try await store.saveMessage(assistantMessage)
+        logger.debug("Saved chat exchange for thread \(query.threadID, privacy: .public)")
         return assistantMessage
     }
 

@@ -1,8 +1,10 @@
 import Foundation
+import OSLog
 
 public final class UpdateService: Sendable {
     private let session: URLSession
     private let latestReleaseURL: URL
+    private let logger = OpenbirdLog.updates
 
     public init(
         session: URLSession = .shared,
@@ -17,6 +19,7 @@ public final class UpdateService: Sendable {
         guard normalizedCurrentVersion.isEmpty == false else {
             return nil
         }
+        logger.notice("Checking for updates from \(normalizedCurrentVersion, privacy: .public)")
 
         var request = URLRequest(url: latestReleaseURL)
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -25,6 +28,8 @@ public final class UpdateService: Sendable {
         let (data, response) = try await session.data(for: request)
         guard let httpResponse = response as? HTTPURLResponse,
               (200..<300).contains(httpResponse.statusCode) else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            logger.error("Update check failed with status \(statusCode, privacy: .public)")
             throw URLError(.badServerResponse)
         }
 
@@ -32,13 +37,16 @@ public final class UpdateService: Sendable {
         let release = try decoder.decode(GitHubRelease.self, from: data)
         let latestVersion = Self.normalizedVersionString(release.tagName)
         guard Self.isVersion(latestVersion, newerThan: normalizedCurrentVersion) else {
+            logger.notice("No update available; latest version is \(latestVersion, privacy: .public)")
             return nil
         }
 
         guard let downloadURL = release.assets.first(where: \.isDiskImage)?.downloadURL else {
+            logger.error("Latest release \(latestVersion, privacy: .public) is missing a DMG asset")
             return nil
         }
 
+        logger.notice("Update available: \(latestVersion, privacy: .public)")
         return AppUpdate(
             version: latestVersion,
             releaseURL: release.htmlURL,

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import OSLog
 
 public final class CollectorRuntime: NSObject, @unchecked Sendable {
     public static let leaseTimeout: TimeInterval = 20
@@ -14,11 +15,13 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
     private let ownerName: String
     private let leaseTimeout: TimeInterval
     private let lifecycleLock = NSLock()
+    private let logger = OpenbirdLog.collector
     private var timer: Timer?
     private var currentEvent: ActivityEvent?
     private var currentFingerprint: String?
     private var ownsLease = false
     private var isStopped = true
+    private var lastCollectorStatus: String?
 
     public init(
         store: OpenbirdStore,
@@ -54,6 +57,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         }
         isStopped = false
         lifecycleLock.unlock()
+        lastCollectorStatus = nil
 
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
@@ -64,6 +68,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         timer = Timer.scheduledTimer(withTimeInterval: captureInterval, repeats: true) { [weak self] _ in
             self?.scheduleCapture()
         }
+        logger.notice("Collector runtime started interval=\(Int(self.captureInterval), privacy: .public)s")
         scheduleCapture()
     }
 
@@ -76,6 +81,8 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         currentEvent = nil
         currentFingerprint = nil
+        lastCollectorStatus = nil
+        logger.notice("Collector runtime stopped")
     }
 
     public func stopAndWait() async {
@@ -84,8 +91,14 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         guard ownsLease else {
             return
         }
-        try? await store.releaseCollectorLease(ownerID: ownerID)
-        ownsLease = false
+        do {
+            try await store.releaseCollectorLease(ownerID: ownerID)
+            ownsLease = false
+            lastCollectorStatus = nil
+            logger.notice("Collector lease released")
+        } catch {
+            logger.error("Failed to release collector lease: \(OpenbirdLog.errorDescription(error), privacy: .public)")
+        }
     }
 
     @objc private func activeApplicationChanged() {
@@ -117,9 +130,13 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
                 timeout: leaseTimeout
             )
             guard claimedLease else {
+                if ownsLease {
+                    logger.notice("Collector lease lost to another runtime")
+                }
                 ownsLease = false
                 currentEvent = nil
                 currentFingerprint = nil
+                lastCollectorStatus = nil
                 return
             }
             ownsLease = true
@@ -135,7 +152,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             if settings.isCapturePaused(now: now, sessionID: ownerID) {
                 currentEvent = nil
                 currentFingerprint = nil
-                _ = try await store.updateCollectorStatus(ownerID: ownerID, status: "paused", heartbeat: now)
+                _ = try await persistCollectorStatus("paused", heartbeat: now)
                 return
             }
 
@@ -144,7 +161,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             }
 
             guard let frontmostApplication = await MainActor.run(body: { FrontmostApplicationContext.current() }) else {
-                _ = try await store.updateCollectorStatus(ownerID: ownerID, status: "idle", heartbeat: now)
+                _ = try await persistCollectorStatus("idle", heartbeat: now)
                 return
             }
 
@@ -155,7 +172,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             guard var snapshot = await MainActor.run(body: {
                 snapshotter.snapshotFrontmostWindow(for: frontmostApplication)
             }) else {
-                _ = try await store.updateCollectorStatus(ownerID: ownerID, status: "idle", heartbeat: now)
+                _ = try await persistCollectorStatus("idle", heartbeat: now)
                 return
             }
 
@@ -181,12 +198,16 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
                 try await store.saveActivityEvent(event)
                 currentEvent = event
                 currentFingerprint = snapshot.fingerprint
+                logger.debug(
+                    "Captured new activity bundleID=\(snapshot.bundleId, privacy: .public) excluded=\(excluded, privacy: .public)"
+                )
             }
 
-            _ = try await store.updateCollectorStatus(ownerID: ownerID, status: "running", heartbeat: snapshot.capturedAt)
+            _ = try await persistCollectorStatus("running", heartbeat: snapshot.capturedAt)
         } catch {
+            logger.error("Collector capture failed: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             if ownsLease {
-                _ = try? await store.updateCollectorStatus(ownerID: ownerID, status: "error", heartbeat: Date())
+                _ = try? await persistCollectorStatus("error", heartbeat: Date())
             }
         }
     }
@@ -201,6 +222,15 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         Task { [weak self] in
             await self?.captureNow()
         }
+    }
+
+    private func persistCollectorStatus(_ status: String, heartbeat: Date) async throws -> Bool {
+        let updated = try await store.updateCollectorStatus(ownerID: ownerID, status: status, heartbeat: heartbeat)
+        if updated, lastCollectorStatus != status {
+            logger.notice("Collector status changed to \(status, privacy: .public)")
+            lastCollectorStatus = status
+        }
+        return updated
     }
 }
 
