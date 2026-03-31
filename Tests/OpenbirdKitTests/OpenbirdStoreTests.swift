@@ -59,13 +59,42 @@ struct OpenbirdStoreTests {
         )
 
         let results = try await store.searchActivityEvents(
-            query: "What have I been doing in the last few minutes?",
+            query: "What local chat retrieval did I implement?",
             in: Calendar.current.dayRange(for: now),
             topK: 5
         )
 
         #expect(results.isEmpty == false)
         #expect(results.first?.appName == "VS Code")
+    }
+
+    @Test func searchDoesNotFallbackToRecentEventsWhenThereIsNoMatch() async throws {
+        let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
+        let store = try OpenbirdStore(databaseURL: databaseURL)
+        let now = Date()
+
+        try await store.saveActivityEvent(
+            ActivityEvent(
+                startedAt: now.addingTimeInterval(-180),
+                endedAt: now,
+                bundleId: "com.microsoft.VSCode",
+                appName: "VS Code",
+                windowTitle: "openbird",
+                url: nil,
+                visibleText: "Implemented local chat retrieval for activity review",
+                source: "accessibility",
+                contentHash: "hash-no-fallback",
+                isExcluded: false
+            )
+        )
+
+        let results = try await store.searchActivityEvents(
+            query: "What was I doing in the last few minutes?",
+            in: Calendar.current.dayRange(for: now),
+            topK: 5
+        )
+
+        #expect(results.isEmpty)
     }
 
     @Test func mergesOverlappingEventsWithSameContentHash() async throws {

@@ -378,7 +378,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         topK: Int
     ) throws -> [ActivityEvent] {
         guard let ftsQuery = makeFTSQuery(from: searchTerm) else {
-            return try loadActivityEvents(in: range).suffix(topK).reversed()
+            return []
         }
 
         var sql = """
@@ -401,11 +401,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
         sql += " ORDER BY activity_events.started_at DESC LIMIT ?;"
         bindings.append(.integer(Int64(topK)))
-        let results = try query(sql, bindings: bindings).map(ActivityEvent.init(row:))
-        if results.isEmpty {
-            return try loadActivityEvents(in: range).suffix(topK).reversed()
-        }
-        return results
+        return try query(sql, bindings: bindings).map(ActivityEvent.init(row:))
     }
 
     public func saveJournal(_ journal: DailyJournal) throws {
