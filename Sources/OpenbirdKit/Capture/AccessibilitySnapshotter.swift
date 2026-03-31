@@ -29,7 +29,6 @@ public struct AccessibilitySnapshotter: Sendable {
 
     public init() {}
 
-    @MainActor
     func snapshotFrontmostWindow(for application: FrontmostApplicationContext) -> WindowSnapshot? {
         if shouldUseMinimalSnapshot(for: application) {
             let snapshot = snapshotSanitizer.sanitize(minimalSnapshot(for: application))
