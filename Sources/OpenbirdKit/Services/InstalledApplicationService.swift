@@ -6,6 +6,7 @@ public struct InstalledApplicationService: Sendable {
     public func listInstalledApplications() -> [InstalledApplication] {
         let searchDirectories = [
             URL(fileURLWithPath: "/Applications", isDirectory: true),
+            URL(fileURLWithPath: "/System/Applications", isDirectory: true),
             FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications", isDirectory: true),
         ]
 

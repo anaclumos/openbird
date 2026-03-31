@@ -976,7 +976,6 @@ final class AppModel: ObservableObject {
         if showUpToDateMessage {
             updateStatusMessage = "Checking for updates…"
         }
-        userDefaults.set(Date(), forKey: Self.lastUpdateCheckDateKey)
 
         defer {
             if updateCheckRequestID == requestID {
@@ -987,6 +986,7 @@ final class AppModel: ObservableObject {
 
         do {
             let update = try await updateService.latestUpdate(currentVersion: currentVersion)
+            userDefaults.set(Date(), forKey: Self.lastUpdateCheckDateKey)
             guard Task.isCancelled == false, updateCheckRequestID == requestID else {
                 return
             }
