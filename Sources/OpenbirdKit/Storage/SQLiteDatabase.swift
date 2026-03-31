@@ -497,11 +497,19 @@ public final class SQLiteDatabase: @unchecked Sendable {
     }
 
     public func deleteEvents(since date: Date) throws {
-        let rows = try query("SELECT id FROM activity_events WHERE started_at >= ?;", bindings: [.double(date.timeIntervalSince1970)])
+        let timestamp = date.timeIntervalSince1970
+        let rows = try query("SELECT id FROM activity_events WHERE started_at >= ?;", bindings: [.double(timestamp)])
         for row in rows {
-            try execute("DELETE FROM activity_events_fts WHERE id = ?;", bindings: [.text(row.stringValue(for: "id"))])
+            let eventID = row.stringValue(for: "id")
+            try execute("DELETE FROM activity_events_fts WHERE id = ?;", bindings: [.text(eventID)])
+            try execute("DELETE FROM embedding_chunks WHERE event_id = ?;", bindings: [.text(eventID)])
         }
-        try execute("DELETE FROM activity_events WHERE started_at >= ?;", bindings: [.double(date.timeIntervalSince1970)])
+        try execute("DELETE FROM activity_events WHERE started_at >= ?;", bindings: [.double(timestamp)])
+    }
+
+    public func deleteEvents(since date: Date, affectedDays: Set<String>) throws {
+        try deleteEvents(since: date)
+        try deleteJournalsAndChats(for: affectedDays)
     }
 
     public func deleteAllEvents() throws {
@@ -509,6 +517,23 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try execute("DELETE FROM activity_events;")
         try execute("DELETE FROM daily_journals;")
         try execute("DELETE FROM embedding_chunks;")
+        try execute("DELETE FROM chat_messages;")
+        try execute("DELETE FROM chat_threads;")
+    }
+
+    private func deleteJournalsAndChats(for days: Set<String>) throws {
+        for day in days {
+            try execute("DELETE FROM daily_journals WHERE day = ?;", bindings: [.text(day)])
+            let threads = try query(
+                "SELECT id FROM chat_threads WHERE start_day = ?;",
+                bindings: [.text(day)]
+            )
+            for thread in threads {
+                let threadID = thread.stringValue(for: "id")
+                try execute("DELETE FROM chat_messages WHERE thread_id = ?;", bindings: [.text(threadID)])
+                try execute("DELETE FROM chat_threads WHERE id = ?;", bindings: [.text(threadID)])
+            }
+        }
     }
 
     public func saveEmbeddingChunk(id: String, eventID: String, providerID: String, model: String, vector: [Double], snippet: String) throws {
