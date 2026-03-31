@@ -334,7 +334,7 @@ struct OpenbirdStoreTests {
         let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
         let store = try OpenbirdStore(databaseURL: databaseURL)
         let provider = ProviderConfig(
-            name: ProviderKind.anthropic.defaultName,
+            name: ProviderKind.anthropic.displayName,
             kind: .anthropic,
             baseURL: ProviderKind.anthropic.defaultBaseURL,
             apiKey: "test-key",

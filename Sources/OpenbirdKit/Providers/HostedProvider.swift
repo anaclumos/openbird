@@ -142,10 +142,6 @@ public struct HostedProvider: LLMProvider {
         }
     }
 
-    public func healthCheck() async throws -> Bool {
-        _ = try await listModels()
-        return true
-    }
 
     private func performRequest<Response: Decodable>(
         path: String,

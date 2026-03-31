@@ -744,7 +744,7 @@ final class AppModel: ObservableObject {
 
     private func sanitizedProviderConfig(_ config: ProviderConfig) -> ProviderConfig {
         var sanitized = config
-        sanitized.name = sanitized.kind.defaultName
+        sanitized.name = sanitized.kind.displayName
         sanitized.baseURL = config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if sanitized.baseURL.isEmpty {

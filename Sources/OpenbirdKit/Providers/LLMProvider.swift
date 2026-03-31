@@ -63,5 +63,4 @@ public protocol LLMProvider: Sendable {
     func listModels() async throws -> [ProviderModelInfo]
     func chat(request: ProviderChatRequest) async throws -> ProviderChatResponse
     func embed(texts: [String]) async throws -> [[Double]]
-    func healthCheck() async throws -> Bool
 }

@@ -35,11 +35,6 @@ public struct OllamaProvider: LLMProvider {
         return response.embeddings
     }
 
-    public func healthCheck() async throws -> Bool {
-        let _: OllamaTagsResponse = try await performRequest(path: "/api/tags")
-        return true
-    }
-
     private func performRequest<Response: Decodable>(
         path: String,
         method: String = "GET",

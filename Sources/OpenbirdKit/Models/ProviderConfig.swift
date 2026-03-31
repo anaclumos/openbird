@@ -25,10 +25,6 @@ public enum ProviderKind: String, Codable, CaseIterable, Sendable {
         }
     }
 
-    public var defaultName: String {
-        displayName
-    }
-
     public var defaultBaseURL: String {
         switch self {
         case .ollama:
@@ -123,7 +119,7 @@ public struct ProviderConfig: Identifiable, Codable, Hashable, Sendable {
     }
 
     public static let defaultOllama = ProviderConfig(
-        name: ProviderKind.ollama.defaultName,
+        name: ProviderKind.ollama.displayName,
         kind: .ollama,
         baseURL: ProviderKind.ollama.defaultBaseURL,
         chatModel: "llama3.2",
@@ -132,7 +128,7 @@ public struct ProviderConfig: Identifiable, Codable, Hashable, Sendable {
     )
 
     public static let defaultLMStudio = ProviderConfig(
-        name: ProviderKind.openAICompatible.defaultName,
+        name: ProviderKind.openAICompatible.displayName,
         kind: .openAICompatible,
         baseURL: ProviderKind.openAICompatible.defaultBaseURL,
         chatModel: "local-model",
@@ -141,28 +137,28 @@ public struct ProviderConfig: Identifiable, Codable, Hashable, Sendable {
     )
 
     public static let defaultOpenAI = ProviderConfig(
-        name: ProviderKind.openAI.defaultName,
+        name: ProviderKind.openAI.displayName,
         kind: .openAI,
         baseURL: ProviderKind.openAI.defaultBaseURL,
         isEnabled: false
     )
 
     public static let defaultAnthropic = ProviderConfig(
-        name: ProviderKind.anthropic.defaultName,
+        name: ProviderKind.anthropic.displayName,
         kind: .anthropic,
         baseURL: ProviderKind.anthropic.defaultBaseURL,
         isEnabled: false
     )
 
     public static let defaultGoogle = ProviderConfig(
-        name: ProviderKind.google.defaultName,
+        name: ProviderKind.google.displayName,
         kind: .google,
         baseURL: ProviderKind.google.defaultBaseURL,
         isEnabled: false
     )
 
     public static let defaultOpenRouter = ProviderConfig(
-        name: ProviderKind.openRouter.defaultName,
+        name: ProviderKind.openRouter.displayName,
         kind: .openRouter,
         baseURL: ProviderKind.openRouter.defaultBaseURL,
         isEnabled: false
