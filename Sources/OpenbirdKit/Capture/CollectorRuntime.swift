@@ -72,11 +72,9 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         scheduleCapture()
     }
 
-    public func resetCaptureState() async {
-        await captureGate.runIfIdle {
-            self.currentEvent = nil
-            self.currentFingerprint = nil
-        }
+    public func resetCaptureState() {
+        currentEvent = nil
+        currentFingerprint = nil
     }
 
     public func stop() {
