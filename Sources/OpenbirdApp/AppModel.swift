@@ -78,7 +78,6 @@ final class AppModel: ObservableObject {
     @Published private(set) var dayLoadStatus: DayLoadStatus?
     @Published private(set) var cachedExclusionState = StatusMenuExclusionState(app: nil, domain: nil)
 
-    let permissionsService = PermissionsService()
     private let store: OpenbirdStore
     private let currentActivityContextService = CurrentActivityContextService()
     private let installedApplicationService = InstalledApplicationService()
@@ -135,7 +134,7 @@ final class AppModel: ObservableObject {
             fatalError("Failed to initialize Openbird store: \(error)")
         }
 
-        accessibilityTrusted = permissionsService.isAccessibilityTrusted
+        accessibilityTrusted = AXIsProcessTrusted()
         collectorRuntime.start()
         refreshInstalledApplications()
         initialRefreshTask = Task {
@@ -528,15 +527,18 @@ final class AppModel: ObservableObject {
     }
 
     func requestAccessibilityPermission() {
-        accessibilityTrusted = permissionsService.requestAccessibilityPermission()
+        let options = ["AXTrustedCheckOptionPrompt": true] as CFDictionary
+        accessibilityTrusted = AXIsProcessTrustedWithOptions(options)
     }
 
     func openAccessibilitySettings() {
-        permissionsService.openAccessibilitySettings()
+        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
+            NSWorkspace.shared.open(url)
+        }
     }
 
     func refreshAccessibilityPermissionState() {
-        let isTrusted = permissionsService.isAccessibilityTrusted
+        let isTrusted = AXIsProcessTrusted()
         guard accessibilityTrusted != isTrusted else {
             return
         }
