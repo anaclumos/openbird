@@ -498,13 +498,16 @@ public final class SQLiteDatabase: @unchecked Sendable {
 
     public func deleteEvents(since date: Date) throws {
         let timestamp = date.timeIntervalSince1970
-        let rows = try query("SELECT id FROM activity_events WHERE started_at >= ?;", bindings: [.double(timestamp)])
+        let rows = try query(
+            "SELECT id FROM activity_events WHERE ended_at >= ?;",
+            bindings: [.double(timestamp)]
+        )
         for row in rows {
             let eventID = row.stringValue(for: "id")
             try execute("DELETE FROM activity_events_fts WHERE id = ?;", bindings: [.text(eventID)])
             try execute("DELETE FROM embedding_chunks WHERE event_id = ?;", bindings: [.text(eventID)])
         }
-        try execute("DELETE FROM activity_events WHERE started_at >= ?;", bindings: [.double(timestamp)])
+        try execute("DELETE FROM activity_events WHERE ended_at >= ?;", bindings: [.double(timestamp)])
     }
 
     public func deleteEvents(since date: Date, affectedDays: Set<String>) throws {
