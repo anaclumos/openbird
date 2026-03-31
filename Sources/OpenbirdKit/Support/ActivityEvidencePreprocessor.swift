@@ -68,7 +68,7 @@ public enum ActivityEvidencePreprocessor {
         preparedEvents.reserveCapacity(events.count)
 
         for event in events {
-            if event.bundleId == "com.apple.loginwindow" || normalizedComparisonKey(for: event.appName) == "loginwindow" {
+            if event.bundleId == "com.apple.loginwindow" || event.appName.normalizedComparisonKey == "loginwindow" {
                 continue
             }
 
@@ -103,18 +103,6 @@ public enum ActivityEvidencePreprocessor {
 
         groups.append(currentGroup.groupedEvent)
         return groups
-    }
-
-    public static func isMeaningful(_ event: ActivityEvent) -> Bool {
-        if event.bundleId == "com.apple.loginwindow" || normalizedComparisonKey(for: event.appName) == "loginwindow" {
-            return false
-        }
-
-        return descriptorComponents(for: event).isEmpty == false
-    }
-
-    public static func cleanedExcerpt(for event: ActivityEvent) -> String {
-        descriptorComponents(for: event).excerpt ?? ""
     }
 
     public static func summarizedURL(from urlString: String?) -> String? {
@@ -180,14 +168,14 @@ public enum ActivityEvidencePreprocessor {
             return nil
         }
 
-        let cleanedKey = normalizedComparisonKey(for: cleaned)
+        let cleanedKey = cleaned.normalizedComparisonKey
         guard cleanedKey.isEmpty == false else {
             return nil
         }
 
         let excludedKeys = values
             .compactMap(cleanText)
-            .map(normalizedComparisonKey(for:))
+            .map(\.normalizedComparisonKey)
             .filter { $0.isEmpty == false }
 
         guard excludedKeys.contains(cleanedKey) == false else {
@@ -201,13 +189,6 @@ public enum ActivityEvidencePreprocessor {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-
-    private static func normalizedComparisonKey(for value: String) -> String {
-        value.lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { $0.isEmpty == false }
-            .joined(separator: " ")
     }
 
     private static func descriptorComponents(for event: ActivityEvent) -> DescriptorComponents {
@@ -323,7 +304,7 @@ public enum ActivityEvidencePreprocessor {
 
         mutating func include(_ event: ActivityEvent) {
             if let detailTitle = ActivityEvidencePreprocessor.cleanText(event.detailTitle) {
-                let key = ActivityEvidencePreprocessor.normalizedComparisonKey(for: detailTitle)
+                let key = detailTitle.normalizedComparisonKey
                 if key.isEmpty == false {
                     detailTitles.insert(key)
                     if preferredDetailTitle == nil || detailTitle.count > (preferredDetailTitle?.count ?? 0) {
@@ -334,7 +315,7 @@ public enum ActivityEvidencePreprocessor {
 
             if let rawURL = ActivityEvidencePreprocessor.cleanText(event.url),
                let urlSummary = ActivityEvidencePreprocessor.summarizedURL(from: rawURL) {
-                let key = ActivityEvidencePreprocessor.normalizedComparisonKey(for: urlSummary)
+                let key = urlSummary.normalizedComparisonKey
                 if key.isEmpty == false {
                     urls.insert(key)
                     if preferredURL == nil || urlSummary.count > (ActivityEvidencePreprocessor.summarizedURL(from: preferredURL)?.count ?? 0) {
@@ -347,7 +328,7 @@ public enum ActivityEvidencePreprocessor {
                 event.visibleText,
                 excluding: [event.appName, event.windowTitle]
             ) {
-                let key = ActivityEvidencePreprocessor.normalizedComparisonKey(for: excerpt)
+                let key = excerpt.normalizedComparisonKey
                 if key.isEmpty == false && excerpts.insert(key).inserted {
                     excerptPieces.append(excerpt)
                 }
@@ -362,7 +343,7 @@ public enum ActivityEvidencePreprocessor {
             preferredURL = preferredURLWithLongestSummary(between: preferredURL, and: components.preferredURL)
 
             for excerpt in components.excerptPieces {
-                let key = ActivityEvidencePreprocessor.normalizedComparisonKey(for: excerpt)
+                let key = excerpt.normalizedComparisonKey
                 if key.isEmpty == false && excerpts.insert(key).inserted {
                     excerptPieces.append(excerpt)
                 }

@@ -93,29 +93,18 @@ public struct ChatQuery: Sendable {
     }
 }
 
-public enum PromptProfile: String, Codable, CaseIterable, Sendable {
-    case concise
-    case detailed
-}
-
 public struct JournalGenerationRequest: Sendable {
     public var date: Date
-    public var timeZone: TimeZone
     public var maxSourceEvents: Int
     public var providerID: String?
-    public var promptProfile: PromptProfile
 
     public init(
         date: Date,
-        timeZone: TimeZone = .current,
         maxSourceEvents: Int = 80,
-        providerID: String? = nil,
-        promptProfile: PromptProfile = .concise
+        providerID: String? = nil
     ) {
         self.date = date
-        self.timeZone = timeZone
         self.maxSourceEvents = maxSourceEvents
         self.providerID = providerID
-        self.promptProfile = promptProfile
     }
 }

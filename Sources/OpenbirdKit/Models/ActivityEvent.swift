@@ -67,12 +67,3 @@ public struct ActivityEvent: Identifiable, Codable, Hashable, Sendable {
         return collapsed.prefix(180).description
     }
 }
-
-private extension String {
-    var normalizedComparisonKey: String {
-        lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { $0.isEmpty == false }
-            .joined(separator: " ")
-    }
-}

@@ -605,21 +605,3 @@ public actor JournalGenerator {
             .union(["finder", "notes", "calendar", "notion", "figma", "linear"])
     }
 }
-
-private extension Array where Element == String {
-    func deduplicatedByNormalizedText() -> [String] {
-        var seen = Set<String>()
-        return filter { value in
-            seen.insert(value.normalizedComparisonKey).inserted
-        }
-    }
-}
-
-private extension String {
-    var normalizedComparisonKey: String {
-        lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { $0.isEmpty == false }
-            .joined(separator: " ")
-    }
-}

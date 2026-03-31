@@ -121,15 +121,6 @@ public enum GoogleDocsCaptureAdvisor {
     }
 }
 
-private extension String {
-    var normalizedComparisonKey: String {
-        lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { $0.isEmpty == false }
-            .joined(separator: " ")
-    }
-}
-
 private let docsChromeLines: Set<String> = [
     "comment",
     "comment history",
