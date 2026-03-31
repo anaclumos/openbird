@@ -1,5 +1,13 @@
 import Foundation
 
+public enum CollectorStatus: String, Codable, CaseIterable, Sendable {
+    case running
+    case paused
+    case idle
+    case error
+    case stopped
+}
+
 public struct AppSettings: Codable, Hashable, Sendable {
     public var capturePaused: Bool
     public var capturePauseUntil: Date?
@@ -8,7 +16,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     public var activeProviderID: String?
     public var selectedProviderID: String?
     public var lastCollectorHeartbeat: Date?
-    public var collectorStatus: String
+    public var collectorStatus: CollectorStatus
     public var collectorOwnerID: String?
     public var collectorOwnerName: String?
 
@@ -20,7 +28,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
         activeProviderID: String? = nil,
         selectedProviderID: String? = nil,
         lastCollectorHeartbeat: Date? = nil,
-        collectorStatus: String = "stopped",
+        collectorStatus: CollectorStatus = .stopped,
         collectorOwnerID: String? = nil,
         collectorOwnerName: String? = nil
     ) {

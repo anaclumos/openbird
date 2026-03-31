@@ -22,7 +22,7 @@ public actor OpenbirdStore {
         try database.claimCollectorLease(ownerID: ownerID, ownerName: ownerName, now: now, timeout: timeout)
     }
 
-    public func updateCollectorStatus(ownerID: String, status: String, heartbeat: Date) throws -> Bool {
+    public func updateCollectorStatus(ownerID: String, status: CollectorStatus, heartbeat: Date) throws -> Bool {
         try database.updateCollectorStatus(ownerID: ownerID, status: status, heartbeat: heartbeat)
     }
 

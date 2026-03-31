@@ -257,13 +257,13 @@ final class AppModel: ObservableObject {
             return "Stopped"
         }
         switch settings.collectorStatus {
-        case "running":
+        case .running:
             return "Capturing"
-        case "paused":
+        case .paused:
             return "Paused"
-        case "idle":
+        case .idle:
             return "Idle"
-        case "error":
+        case .error:
             return "Collector Error"
         default:
             return "Stopped"

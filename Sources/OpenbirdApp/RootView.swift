@@ -103,7 +103,7 @@ private struct CaptureToolbarButton: View {
         guard model.isCapturePaused == false else { return false }
         guard model.isCollectorActiveElsewhere == false else { return false }
         guard model.isCollectorHeartbeatFresh else { return false }
-        return model.settings.collectorStatus == "running"
+        return model.settings.collectorStatus == .running
     }
 
     private var statusColor: Color {
@@ -111,9 +111,9 @@ private struct CaptureToolbarButton: View {
         if model.isCollectorActiveElsewhere { return .secondary }
         if model.isCollectorHeartbeatFresh == false { return .secondary }
         switch model.settings.collectorStatus {
-        case "running":
+        case .running:
             return .accentColor
-        case "error":
+        case .error:
             return .red
         default:
             return .secondary
@@ -137,9 +137,9 @@ private struct CaptureToolbarButton: View {
         if model.isCollectorActiveElsewhere { return "desktopcomputer" }
         if model.isCollectorHeartbeatFresh == false { return "stop.fill" }
         switch model.settings.collectorStatus {
-        case "running":
+        case .running:
             return "record.circle.fill"
-        case "error":
+        case .error:
             return "exclamationmark"
         default:
             return "stop.fill"

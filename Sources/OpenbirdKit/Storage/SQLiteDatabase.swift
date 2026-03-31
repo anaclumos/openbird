@@ -137,7 +137,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         if let heartbeat = normalizeOptionalSetting(dict["lastCollectorHeartbeat"]), let timestamp = Double(heartbeat) {
             settings.lastCollectorHeartbeat = Date(timeIntervalSince1970: timestamp)
         }
-        settings.collectorStatus = dict["collectorStatus"] ?? "stopped"
+        settings.collectorStatus = CollectorStatus(rawValue: dict["collectorStatus"] ?? "stopped") ?? .stopped
         settings.collectorOwnerID = normalizeOptionalSetting(dict["collectorOwnerID"])
         settings.collectorOwnerName = normalizeOptionalSetting(dict["collectorOwnerName"])
         return settings
@@ -152,7 +152,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
             ("activeProviderID", settings.activeProviderID ?? ""),
             ("selectedProviderID", settings.selectedProviderID ?? ""),
             ("lastCollectorHeartbeat", settings.lastCollectorHeartbeat.map { String($0.timeIntervalSince1970) } ?? ""),
-            ("collectorStatus", settings.collectorStatus),
+            ("collectorStatus", settings.collectorStatus.rawValue),
             ("collectorOwnerID", settings.collectorOwnerID ?? ""),
             ("collectorOwnerName", settings.collectorOwnerName ?? ""),
         ]
@@ -179,7 +179,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
                 return false
             }
             if currentOwnerID != ownerID {
-                settings.collectorStatus = settings.isCapturePaused(now: now, sessionID: ownerID) ? "paused" : "idle"
+                settings.collectorStatus = settings.isCapturePaused(now: now, sessionID: ownerID) ? .paused : .idle
             }
             settings.collectorOwnerID = ownerID
             settings.collectorOwnerName = ownerName
@@ -189,7 +189,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
     }
 
-    public func updateCollectorStatus(ownerID: String, status: String, heartbeat: Date) throws -> Bool {
+    public func updateCollectorStatus(ownerID: String, status: CollectorStatus, heartbeat: Date) throws -> Bool {
         try withImmediateTransaction {
             var settings = try loadSettings()
             guard settings.collectorOwnerID == ownerID else {
@@ -212,7 +212,7 @@ public final class SQLiteDatabase: @unchecked Sendable {
             settings.collectorOwnerID = nil
             settings.collectorOwnerName = nil
             settings.lastCollectorHeartbeat = nil
-            settings.collectorStatus = settings.isCapturePaused(sessionID: ownerID) ? "paused" : "stopped"
+            settings.collectorStatus = settings.isCapturePaused(sessionID: ownerID) ? .paused : .stopped
             try saveSettings(settings)
         }
     }

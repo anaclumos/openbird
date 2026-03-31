@@ -356,7 +356,19 @@ struct OpenbirdStoreTests {
         #expect(recovered)
         #expect(settings.collectorOwnerID == nil)
         #expect(settings.collectorOwnerName == nil)
-        #expect(settings.collectorStatus == "stopped")
+        #expect(settings.collectorStatus == .stopped)
+    }
+
+    @Test func collectorStatusRoundTripsThroughSettingsStorage() async throws {
+        let databaseURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("sqlite")
+        let store = try OpenbirdStore(databaseURL: databaseURL)
+
+        var settings = try await store.loadSettings()
+        settings.collectorStatus = .error
+        try await store.saveSettings(settings)
+
+        let reloadedSettings = try await store.loadSettings()
+        #expect(reloadedSettings.collectorStatus == .error)
     }
 
     @Test func savesSelectedProviderIDAlongsideProviderDrafts() async throws {

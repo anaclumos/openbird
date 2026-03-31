@@ -157,7 +157,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             if settings.isCapturePaused(now: now, sessionID: ownerID) {
                 currentEvent = nil
                 currentFingerprint = nil
-                _ = try await persistCollectorStatus("paused", heartbeat: now)
+                _ = try await persistCollectorStatus(.paused, heartbeat: now)
                 return
             }
 
@@ -166,7 +166,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             }
 
             guard let frontmostApplication = await MainActor.run(body: { FrontmostApplicationContext.current() }) else {
-                _ = try await persistCollectorStatus("idle", heartbeat: now)
+                _ = try await persistCollectorStatus(.idle, heartbeat: now)
                 return
             }
 
@@ -175,7 +175,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
             }
 
             guard var snapshot = snapshotter.snapshotFrontmostWindow(for: frontmostApplication) else {
-                _ = try await persistCollectorStatus("idle", heartbeat: now)
+                _ = try await persistCollectorStatus(.idle, heartbeat: now)
                 return
             }
 
@@ -206,11 +206,11 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
                 )
             }
 
-            _ = try await persistCollectorStatus("running", heartbeat: snapshot.capturedAt)
+            _ = try await persistCollectorStatus(.running, heartbeat: snapshot.capturedAt)
         } catch {
             logger.error("Collector capture failed: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             if ownsLease {
-                _ = try? await persistCollectorStatus("error", heartbeat: Date())
+                _ = try? await persistCollectorStatus(.error, heartbeat: Date())
             }
         }
     }
@@ -227,11 +227,11 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         }
     }
 
-    private func persistCollectorStatus(_ status: String, heartbeat: Date) async throws -> Bool {
+    private func persistCollectorStatus(_ status: CollectorStatus, heartbeat: Date) async throws -> Bool {
         let updated = try await store.updateCollectorStatus(ownerID: ownerID, status: status, heartbeat: heartbeat)
-        if updated, lastCollectorStatus != status {
-            logger.notice("Collector status changed to \(status, privacy: .public)")
-            lastCollectorStatus = status
+        if updated, lastCollectorStatus != status.rawValue {
+            logger.notice("Collector status changed to \(status.rawValue, privacy: .public)")
+            lastCollectorStatus = status.rawValue
         }
         return updated
     }
