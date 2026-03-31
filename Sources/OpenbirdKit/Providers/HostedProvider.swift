@@ -142,7 +142,6 @@ public struct HostedProvider: LLMProvider {
         }
     }
 
-
     private func performRequest<Response: Decodable>(
         path: String,
         method: String = "GET",
@@ -445,11 +444,6 @@ private struct OpenRouterModelsResponse: Decodable {
             case canonicalSlug = "canonical_slug"
             case createdAt = "created"
             case architecture
-            case topProvider = "top_provider"
-            case perRequestLimits = "per_request_limits"
-            case pricing
-            case contextLength = "context_length"
-            case huggingFaceID = "hugging_face_id"
         }
 
         init(from decoder: Decoder) throws {
