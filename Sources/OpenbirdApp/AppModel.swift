@@ -84,7 +84,7 @@ final class AppModel: ObservableObject {
     private let journalGenerator: JournalGenerator
     private let retrievalService: RetrievalService
     private let chatService: ChatService
-    private let retentionService: RetentionService
+
     private let collectorRuntime: CollectorRuntime
     private let collectorOwnerID: String
     private let updateService: UpdateService
@@ -121,7 +121,7 @@ final class AppModel: ObservableObject {
             self.journalGenerator = JournalGenerator(store: store)
             self.retrievalService = RetrievalService(store: store)
             self.chatService = ChatService(store: store, retrievalService: retrievalService)
-            self.retentionService = RetentionService(store: store)
+
             self.collectorOwnerID = collectorOwnerID
             self.collectorRuntime = CollectorRuntime(
                 store: store,
@@ -1152,7 +1152,14 @@ final class AppModel: ObservableObject {
     func deleteData(scope: DataDeletionScope) {
         Task {
             do {
-                try await retentionService.delete(scope: scope)
+                switch scope {
+                case .lastHour:
+                    try await store.deleteEvents(since: Date().addingTimeInterval(-3600))
+                case .lastDay:
+                    try await store.deleteEvents(since: Date().addingTimeInterval(-(24 * 3600)))
+                case .all:
+                    try await store.deleteAllEvents()
+                }
                 logger.notice("Deleted data scope=\(String(describing: scope), privacy: .public)")
                 await refresh()
             } catch {

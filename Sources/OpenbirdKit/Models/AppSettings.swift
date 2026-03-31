@@ -109,3 +109,9 @@ public struct AppSettings: Codable, Hashable, Sendable {
         capturePauseSessionID = nil
     }
 }
+
+public enum DataDeletionScope: String, CaseIterable, Sendable {
+    case lastHour
+    case lastDay
+    case all
+}
