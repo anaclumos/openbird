@@ -26,22 +26,4 @@ public struct ExclusionEngine {
         }
         return false
     }
-
-    private func normalizedDomain(from value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-              value.isEmpty == false
-        else {
-            return nil
-        }
-
-        let candidates = value.contains("://") ? [value] : [value, "https://\(value)"]
-        for candidate in candidates {
-            if let host = URLComponents(string: candidate)?.host?.lowercased(),
-               host.isEmpty == false {
-                return host
-            }
-        }
-
-        return nil
-    }
 }

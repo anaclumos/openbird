@@ -45,25 +45,8 @@ public struct CurrentActivityContextService: Sendable {
         return CurrentActivityContext(
             appName: snapshot.appName,
             bundleID: snapshot.bundleId,
-            domain: Self.normalizedDomain(from: snapshot.url)
+            domain: normalizedDomain(from: snapshot.url)
         )
     }
 
-    static func normalizedDomain(from url: String?) -> String? {
-        guard let rawURL = url?.trimmingCharacters(in: .whitespacesAndNewlines),
-              rawURL.isEmpty == false
-        else {
-            return nil
-        }
-
-        let candidates = rawURL.contains("://") ? [rawURL] : [rawURL, "https://\(rawURL)"]
-        for candidate in candidates {
-            if let host = URLComponents(string: candidate)?.host?.lowercased(),
-               host.isEmpty == false {
-                return host
-            }
-        }
-
-        return nil
-    }
 }

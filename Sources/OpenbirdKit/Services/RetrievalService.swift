@@ -18,7 +18,7 @@ public actor RetrievalService {
             query: query,
             in: range,
             appFilters: appFilters,
-            topK: max(topK * 2, topK)
+            topK: topK * 2
         )
 
         guard let providerConfig,

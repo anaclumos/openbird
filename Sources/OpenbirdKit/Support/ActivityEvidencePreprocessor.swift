@@ -129,15 +129,6 @@ public enum ActivityEvidencePreprocessor {
         return summary.count > 80 ? String(summary.prefix(80)) + "…" : summary
     }
 
-    private static func descriptorComponents(for events: [ActivityEvent]) -> DescriptorComponents {
-        var accumulator = DescriptorAccumulator()
-        for event in events {
-            accumulator.include(event)
-        }
-
-        return accumulator.components
-    }
-
     private static func cleanedVisibleText(_ text: String, excluding values: [String]) -> String? {
         var cleaned = text
             .replacingOccurrences(of: "\n", with: " ")
