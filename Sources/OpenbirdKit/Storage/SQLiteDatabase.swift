@@ -515,6 +515,20 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try deleteJournalsAndChats(for: affectedDays)
     }
 
+    public func deleteEventsBefore(_ date: Date) throws {
+        let timestamp = date.timeIntervalSince1970
+        let rows = try query(
+            "SELECT id FROM activity_events WHERE ended_at < ?;",
+            bindings: [.double(timestamp)]
+        )
+        for row in rows {
+            let eventID = row.stringValue(for: "id")
+            try execute("DELETE FROM activity_events_fts WHERE id = ?;", bindings: [.text(eventID)])
+            try execute("DELETE FROM embedding_chunks WHERE event_id = ?;", bindings: [.text(eventID)])
+        }
+        try execute("DELETE FROM activity_events WHERE ended_at < ?;", bindings: [.double(timestamp)])
+    }
+
     public func deleteAllEvents() throws {
         try execute("DELETE FROM activity_events_fts;")
         try execute("DELETE FROM activity_events;")
@@ -524,7 +538,25 @@ public final class SQLiteDatabase: @unchecked Sendable {
         try execute("DELETE FROM chat_threads;")
     }
 
-    private func deleteJournalsAndChats(for days: Set<String>) throws {
+    func deleteJournalsAndChatsBefore(day: String) throws {
+        let threads = try query(
+            "SELECT id FROM chat_threads WHERE start_day < ?;",
+            bindings: [.text(day)]
+        )
+        for thread in threads {
+            if case .text(let threadID) = thread["id"] {
+                try execute("DELETE FROM chat_messages WHERE thread_id = ?;", bindings: [.text(threadID)])
+                try execute("DELETE FROM chat_threads WHERE id = ?;", bindings: [.text(threadID)])
+            }
+        }
+        try execute("DELETE FROM daily_journals WHERE day < ?;", bindings: [.text(day)])
+    }
+
+    func deletePreparedActivityEventsBefore(day: String) throws {
+        try execute("DELETE FROM prepared_activity_days WHERE day < ?;", bindings: [.text(day)])
+    }
+
+    func deleteJournalsAndChats(for days: Set<String>) throws {
         for day in days {
             try execute("DELETE FROM daily_journals WHERE day = ?;", bindings: [.text(day)])
             let threads = try query(

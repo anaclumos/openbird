@@ -431,6 +431,7 @@ final class AppModel: ObservableObject {
                 detail: "Reading your saved settings, providers, and exclusions from the local store."
             )
             settings = try await loadCurrentSettings()
+            try await store.enforceRetention(retentionDays: settings.retentionDays)
             providerConfigs = try await store.loadProviderConfigs()
             exclusions = try await store.loadExclusions()
             if let selectedProvider {

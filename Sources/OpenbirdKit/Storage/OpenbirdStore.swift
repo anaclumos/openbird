@@ -99,6 +99,16 @@ public actor OpenbirdStore {
         invalidatePreparedActivityDays(for: affectedDays)
     }
 
+    public func enforceRetention(retentionDays: Int) throws {
+        guard retentionDays > 0 else { return }
+        let calendar = Calendar.current
+        guard let cutoff = calendar.date(byAdding: .day, value: -retentionDays, to: calendar.startOfDay(for: Date())) else { return }
+        try database.deleteEventsBefore(cutoff)
+        let cutoffDay = OpenbirdDateFormatting.dayString(for: cutoff)
+        try database.deleteJournalsAndChatsBefore(day: cutoffDay)
+        try database.deletePreparedActivityEventsBefore(day: cutoffDay)
+    }
+
     public func deleteAllEvents() throws {
         try database.deleteAllEvents()
         try database.deleteAllPreparedActivityEvents()
