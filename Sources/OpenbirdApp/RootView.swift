@@ -13,6 +13,15 @@ struct RootView: View {
         TodayView(model: model)
         .toolbar {
             ToolbarItem(placement: .automatic) {
+                Button {
+                    model.isShowingRawLogInspector = true
+                } label: {
+                    Label("Raw Logs", systemImage: "list.bullet.rectangle")
+                }
+                .help("Inspect raw captured activity")
+                .disabled(model.rawEvents.isEmpty)
+            }
+            ToolbarItem(placement: .automatic) {
                 CaptureToolbarButton(model: model)
             }
             if model.availableUpdate != nil {
