@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 public struct WindowSnapshot: Sendable {
@@ -51,6 +52,7 @@ public struct WindowSnapshot: Sendable {
 
 private extension String {
     var stableHash: String {
-        Data(utf8).base64EncodedString()
+        let digest = SHA256.hash(data: Data(utf8))
+        return digest.map { String(format: "%02x", $0) }.joined()
     }
 }
