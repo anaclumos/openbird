@@ -725,8 +725,8 @@ public final class SQLiteDatabase: @unchecked Sendable {
         let countRows = try query("SELECT COUNT(*) AS value FROM provider_configs;")
         let count = countRows.first?.intValue(for: "value") ?? 0
         guard count == 0 else { return }
-        try saveProviderConfig(.defaultOllama)
-        try saveProviderConfig(.defaultLMStudio)
+        try saveProviderConfig(.defaultPreset(for: .ollama))
+        try saveProviderConfig(.defaultPreset(for: .openAICompatible))
         try saveSettings(AppSettings())
     }
 

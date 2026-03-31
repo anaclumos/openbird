@@ -54,7 +54,7 @@ final class AppModel: ObservableObject {
     @Published var exclusions: [ExclusionRule] = []
     @Published var installedApplications: [InstalledApplication] = []
     @Published var availableUpdate: AppUpdate?
-    @Published var editingProvider = ProviderConfig.defaultOllama
+    @Published var editingProvider = ProviderConfig.defaultPreset(for: .ollama)
     @Published var selectedDay = Date()
     @Published var todayJournal: DailyJournal?
     @Published var rawEvents: [ActivityEvent] = []

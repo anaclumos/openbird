@@ -118,66 +118,23 @@ public struct ProviderConfig: Identifiable, Codable, Hashable, Sendable {
         self.updatedAt = updatedAt
     }
 
-    public static let defaultOllama = ProviderConfig(
-        name: ProviderKind.ollama.displayName,
-        kind: .ollama,
-        baseURL: ProviderKind.ollama.defaultBaseURL,
-        chatModel: "llama3.2",
-        embeddingModel: "nomic-embed-text",
-        isEnabled: false
-    )
-
-    public static let defaultLMStudio = ProviderConfig(
-        name: ProviderKind.openAICompatible.displayName,
-        kind: .openAICompatible,
-        baseURL: ProviderKind.openAICompatible.defaultBaseURL,
-        chatModel: "local-model",
-        embeddingModel: "text-embedding-model",
-        isEnabled: false
-    )
-
-    public static let defaultOpenAI = ProviderConfig(
-        name: ProviderKind.openAI.displayName,
-        kind: .openAI,
-        baseURL: ProviderKind.openAI.defaultBaseURL,
-        isEnabled: false
-    )
-
-    public static let defaultAnthropic = ProviderConfig(
-        name: ProviderKind.anthropic.displayName,
-        kind: .anthropic,
-        baseURL: ProviderKind.anthropic.defaultBaseURL,
-        isEnabled: false
-    )
-
-    public static let defaultGoogle = ProviderConfig(
-        name: ProviderKind.google.displayName,
-        kind: .google,
-        baseURL: ProviderKind.google.defaultBaseURL,
-        isEnabled: false
-    )
-
-    public static let defaultOpenRouter = ProviderConfig(
-        name: ProviderKind.openRouter.displayName,
-        kind: .openRouter,
-        baseURL: ProviderKind.openRouter.defaultBaseURL,
-        isEnabled: false
-    )
-
     public static func defaultPreset(for kind: ProviderKind) -> ProviderConfig {
+        var config = ProviderConfig(
+            name: kind.displayName,
+            kind: kind,
+            baseURL: kind.defaultBaseURL,
+            isEnabled: false
+        )
         switch kind {
         case .ollama:
-            return .defaultOllama
+            config.chatModel = "llama3.2"
+            config.embeddingModel = "nomic-embed-text"
         case .openAICompatible:
-            return .defaultLMStudio
-        case .openAI:
-            return .defaultOpenAI
-        case .anthropic:
-            return .defaultAnthropic
-        case .google:
-            return .defaultGoogle
-        case .openRouter:
-            return .defaultOpenRouter
+            config.chatModel = "local-model"
+            config.embeddingModel = "text-embedding-model"
+        case .openAI, .anthropic, .google, .openRouter:
+            break
         }
+        return config
     }
 }
