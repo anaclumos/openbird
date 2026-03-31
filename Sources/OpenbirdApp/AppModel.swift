@@ -633,6 +633,9 @@ final class AppModel: ObservableObject {
             logger.error("Failed to refresh collector state: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             errorMessage = error.localizedDescription
         }
+    }
+
+    func refreshExclusionState() {
         cachedExclusionState = statusMenuExclusionState()
     }
 

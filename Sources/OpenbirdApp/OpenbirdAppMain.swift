@@ -173,6 +173,7 @@ private struct OpenbirdStatusMenu: View {
             appLifecycle.quitCompletely()
         }
         .onAppear {
+            model.refreshExclusionState()
             Task { await model.refreshCollectorState() }
         }
     }
