@@ -247,8 +247,8 @@ public struct HostedProvider: LLMProvider {
             logger.error(
                 "Provider request failed kind=\(config.kind.rawValue, privacy: .public) path=\(path, privacy: .public) status=\(statusCode, privacy: .public)"
             )
-            let message = String(data: data, encoding: .utf8) ?? "Request failed"
-            throw NSError(domain: "HostedProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+            let body = String(data: data, encoding: .utf8) ?? "Request failed"
+            throw HostedProviderError.httpError(statusCode: statusCode, body: body)
         }
     }
 
@@ -298,6 +298,7 @@ public struct HostedProvider: LLMProvider {
 private enum HostedProviderError: LocalizedError {
     case missingAPIKey(String)
     case unsupportedProvider
+    case httpError(statusCode: Int, body: String)
 
     var errorDescription: String? {
         switch self {
@@ -305,6 +306,8 @@ private enum HostedProviderError: LocalizedError {
             return "Enter a \(provider) API key."
         case .unsupportedProvider:
             return "Unsupported provider."
+        case .httpError(_, let body):
+            return body
         }
     }
 }

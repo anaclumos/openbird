@@ -80,8 +80,8 @@ public struct OllamaProvider: LLMProvider {
               200..<300 ~= httpResponse.statusCode else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             logger.error("Ollama request failed path=\(path, privacy: .public) status=\(statusCode, privacy: .public)")
-            let message = String(data: data, encoding: .utf8) ?? "Request failed"
-            throw NSError(domain: "OllamaProvider", code: 1, userInfo: [NSLocalizedDescriptionKey: message])
+            let body = String(data: data, encoding: .utf8) ?? "Request failed"
+            throw OllamaProviderError.httpError(statusCode: statusCode, body: body)
         }
     }
 
@@ -151,4 +151,15 @@ private struct OllamaEmbedRequest: Encodable {
 
 private struct OllamaEmbedResponse: Decodable {
     var embeddings: [[Double]]
+}
+
+private enum OllamaProviderError: LocalizedError {
+    case httpError(statusCode: Int, body: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .httpError(_, let body):
+            return body
+        }
+    }
 }
