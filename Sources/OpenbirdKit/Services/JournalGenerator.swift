@@ -450,7 +450,7 @@ public actor JournalGenerator {
             return true
         }
 
-        return genericToolLabels.contains(normalizedTopic)
+        return Self.genericToolLabels.contains(normalizedTopic)
     }
 
     private func bestStoryContext(for section: PreparedSection) -> String? {
@@ -462,7 +462,7 @@ public actor JournalGenerator {
             .filter {
                 $0.isEmpty == false &&
                 $0.normalizedComparisonKey != topicKey &&
-                genericToolLabels.contains($0.normalizedComparisonKey) == false
+                Self.genericToolLabels.contains($0.normalizedComparisonKey) == false
             }
         if let detailTitle = detailTitles.first {
             return detailTitle
@@ -486,13 +486,13 @@ public actor JournalGenerator {
 
     private func dominantCategory(for section: PreparedSection) -> ActivityCategory {
         let appNames = Set(section.groupedEvents.map { $0.appName.normalizedComparisonKey })
-        if appNames.isDisjoint(with: browserAppLabels) == false {
+        if appNames.isDisjoint(with: Self.browserAppLabels) == false {
             return .browser
         }
-        if appNames.isDisjoint(with: communicationAppLabels) == false {
+        if appNames.isDisjoint(with: Self.communicationAppLabels) == false {
             return .communication
         }
-        if appNames.isDisjoint(with: developmentAppLabels) == false {
+        if appNames.isDisjoint(with: Self.developmentAppLabels) == false {
             return .development
         }
         return .generic
@@ -586,22 +586,18 @@ public actor JournalGenerator {
         case generic
     }
 
-    private var browserAppLabels: Set<String> {
+    private static let browserAppLabels: Set<String> =
         ["safari", "google chrome", "chrome", "arc", "firefox", "brave", "microsoft edge", "edge"]
-    }
 
-    private var communicationAppLabels: Set<String> {
+    private static let communicationAppLabels: Set<String> =
         ["slack", "messages", "imessage", "discord", "kakaotalk", "telegram", "whatsapp", "mail", "gmail"]
-    }
 
-    private var developmentAppLabels: Set<String> {
+    private static let developmentAppLabels: Set<String> =
         ["xcode", "visual studio code", "vs code", "cursor", "zed", "terminal", "iterm2", "warp", "nova"]
-    }
 
-    private var genericToolLabels: Set<String> {
+    private static let genericToolLabels: Set<String> =
         browserAppLabels
             .union(communicationAppLabels)
             .union(developmentAppLabels)
             .union(["finder", "notes", "calendar", "notion", "figma", "linear"])
-    }
 }
