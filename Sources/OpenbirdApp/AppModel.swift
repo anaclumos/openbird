@@ -1163,6 +1163,7 @@ final class AppModel: ObservableObject {
                 case .all:
                     try await store.deleteAllEvents()
                 }
+                await collectorRuntime.resetCaptureState()
                 logger.notice("Deleted data scope=\(String(describing: scope), privacy: .public)")
                 await refresh()
             } catch {

@@ -72,6 +72,13 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
         scheduleCapture()
     }
 
+    public func resetCaptureState() async {
+        await captureGate.runIfIdle {
+            self.currentEvent = nil
+            self.currentFingerprint = nil
+        }
+    }
+
     public func stop() {
         lifecycleLock.lock()
         isStopped = true
@@ -187,7 +194,7 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
 
             let exclusions = try await store.loadExclusions()
             let excluded = exclusionEngine.isExcluded(snapshot: snapshot, rules: exclusions)
-            if currentFingerprint == snapshot.fingerprint, var currentEvent {
+            if currentFingerprint == snapshot.fingerprint, var currentEvent, currentEvent.isExcluded == excluded {
                 currentEvent.endedAt = snapshot.capturedAt
                 try await store.saveActivityEvent(currentEvent)
                 self.currentEvent = currentEvent
