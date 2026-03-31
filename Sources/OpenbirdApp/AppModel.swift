@@ -76,6 +76,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var shouldFocusChatComposer = false
     @Published private(set) var accessibilityTrusted = false
     @Published private(set) var dayLoadStatus: DayLoadStatus?
+    @Published private(set) var cachedExclusionState = StatusMenuExclusionState(app: nil, domain: nil)
 
     let permissionsService = PermissionsService()
     private let store: OpenbirdStore
@@ -630,6 +631,7 @@ final class AppModel: ObservableObject {
             logger.error("Failed to refresh collector state: \(OpenbirdLog.errorDescription(error), privacy: .public)")
             errorMessage = error.localizedDescription
         }
+        cachedExclusionState = statusMenuExclusionState()
     }
 
     func toggleCapturePaused() {

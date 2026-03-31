@@ -146,7 +146,7 @@ private struct OpenbirdStatusMenu: View {
             }
         }
 
-        ExcludeStatusMenu(state: model.statusMenuExclusionState()) { kind, pattern in
+        ExcludeStatusMenu(state: model.cachedExclusionState) { kind, pattern in
             model.addExclusion(kind: kind, pattern: pattern)
         }
         .equatable()
