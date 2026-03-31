@@ -25,27 +25,16 @@ public struct CurrentActivityContextService: Sendable {
             return nil
         }
 
-        var snapshot = snapshotter.snapshotFrontmostWindow(for: application)
-            ?? WindowSnapshot(
-                bundleId: application.bundleID,
-                appName: application.appName,
-                windowTitle: application.appName,
-                url: nil,
-                visibleText: "",
-                source: "workspace"
-            )
-
-        if snapshot.url == nil {
-            snapshot.url = browserURLResolver.currentURL(
-                for: snapshot.bundleId,
-                windowTitle: snapshot.windowTitle
-            )
-        }
+        let snapshot = snapshotter.snapshotFrontmostWindow(for: application)
+        let url = snapshot?.url ?? browserURLResolver.currentURL(
+            for: application.bundleID,
+            windowTitle: snapshot?.windowTitle ?? application.appName
+        )
 
         return CurrentActivityContext(
-            appName: snapshot.appName,
-            bundleID: snapshot.bundleId,
-            domain: normalizedDomain(from: snapshot.url)
+            appName: application.appName,
+            bundleID: application.bundleID,
+            domain: normalizedDomain(from: url)
         )
     }
 
