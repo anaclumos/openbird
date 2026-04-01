@@ -144,12 +144,20 @@ final class AppModel: ObservableObject {
     }
 
     deinit {
-        initialRefreshTask?.cancel()
-        chatSendTask?.cancel()
-        providerConnectionTask?.cancel()
-        providerSaveTask?.cancel()
-        updateCheckTask?.cancel()
+        Self.cancelTasks([
+            initialRefreshTask,
+            chatSendTask,
+            providerConnectionTask,
+            providerSaveTask,
+            updateCheckTask,
+        ])
         collectorRuntime.stop()
+    }
+
+    nonisolated private static func cancelTasks(_ tasks: [Task<Void, Never>?]) {
+        for task in tasks {
+            task?.cancel()
+        }
     }
 
     var accessibilityTargetName: String {
@@ -393,11 +401,13 @@ final class AppModel: ObservableObject {
 
         isShuttingDown = true
         logger.notice("Preparing app model for shutdown")
-        initialRefreshTask?.cancel()
-        chatSendTask?.cancel()
-        providerConnectionTask?.cancel()
-        providerSaveTask?.cancel()
-        updateCheckTask?.cancel()
+        Self.cancelTasks([
+            initialRefreshTask,
+            chatSendTask,
+            providerConnectionTask,
+            providerSaveTask,
+            updateCheckTask,
+        ])
         await collectorRuntime.stopAndWait()
     }
 
