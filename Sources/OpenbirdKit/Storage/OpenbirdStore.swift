@@ -96,6 +96,7 @@ public actor OpenbirdStore {
         let affectedDays = dayStrings(in: date...Date())
         try database.deleteEvents(since: date, affectedDays: affectedDays)
         try database.deletePreparedActivityEvents(for: affectedDays)
+        try database.deleteActivityChunks(for: affectedDays)
         invalidatePreparedActivityDays(for: affectedDays)
     }
 
@@ -107,11 +108,13 @@ public actor OpenbirdStore {
         let cutoffDay = OpenbirdDateFormatting.dayString(for: cutoff)
         try database.deleteJournalsAndChatsBefore(day: cutoffDay)
         try database.deletePreparedActivityEventsBefore(day: cutoffDay)
+        try database.deleteActivityChunksBefore(day: cutoffDay)
     }
 
     public func deleteAllEvents() throws {
         try database.deleteAllEvents()
         try database.deleteAllPreparedActivityEvents()
+        try database.deleteAllActivityChunks()
     }
 
     public func saveEmbeddingChunk(id: String, eventID: String, providerID: String, model: String, vector: [Double], snippet: String) throws {
@@ -120,6 +123,24 @@ public actor OpenbirdStore {
 
     public func loadEmbeddingChunks(providerID: String, model: String) throws -> [(eventID: String, vector: [Double], snippet: String)] {
         try database.loadEmbeddingChunks(providerID: providerID, model: model)
+    }
+
+    public func activityChunks(for date: Date) async throws -> [ActivityChunk] {
+        let day = OpenbirdDateFormatting.dayString(for: date)
+        if dirtyPreparedActivityDays.contains(day) == false {
+            let cachedChunks = try database.loadActivityChunks(for: day)
+            if cachedChunks.isEmpty == false {
+                return cachedChunks
+            }
+
+            if let preparedEvents = try database.loadPreparedActivityEvents(for: day),
+               preparedEvents.isEmpty {
+                return []
+            }
+        }
+
+        _ = try await rebuildPreparedActivityEvents(for: day, date: date)
+        return try database.loadActivityChunks(for: day)
     }
 
     public func preparedActivityEvents(for date: Date) async throws -> [GroupedActivityEvent] {
@@ -149,6 +170,10 @@ public actor OpenbirdStore {
             ActivityEvidencePreprocessor.groupedMeaningfulEvents(from: rawEvents)
         }.value
         try database.savePreparedActivityEvents(groupedEvents, for: day)
+        try database.saveActivityChunks(
+            ActivityChunker.makeChunks(from: groupedEvents, day: day),
+            for: day
+        )
         dirtyPreparedActivityDays.remove(day)
         return groupedEvents
     }

@@ -596,6 +596,45 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
     }
 
+    public func loadActivityChunks(for day: String) throws -> [ActivityChunk] {
+        try query(
+            "SELECT * FROM activity_chunks WHERE day = ? ORDER BY started_at ASC;",
+            bindings: [.text(day)]
+        ).compactMap { row in
+            ActivityChunk(row: row, database: self)
+        }
+    }
+
+    public func saveActivityChunks(_ chunks: [ActivityChunk], for day: String) throws {
+        try withImmediateTransaction {
+            try execute("DELETE FROM activity_chunks WHERE day = ?;", bindings: [.text(day)])
+
+            for chunk in chunks {
+                let sourceEventIDs = try encode(chunk.sourceEventIDs)
+                try execute(
+                    """
+                    INSERT INTO activity_chunks
+                    (id, day, started_at, ended_at, bundle_id, app_name, title, url, excerpt, is_excluded, source_event_ids_json)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    """,
+                    bindings: [
+                        .text(chunk.id),
+                        .text(chunk.day),
+                        .double(chunk.startedAt.timeIntervalSince1970),
+                        .double(chunk.endedAt.timeIntervalSince1970),
+                        .text(chunk.bundleId),
+                        .text(chunk.appName),
+                        .text(chunk.title),
+                        chunk.url.map(SQLiteValue.text) ?? .null,
+                        .text(chunk.excerpt),
+                        .integer(chunk.isExcluded ? 1 : 0),
+                        .text(sourceEventIDs),
+                    ]
+                )
+            }
+        }
+    }
+
     public func loadPreparedActivityEvents(for day: String) throws -> [GroupedActivityEvent]? {
         guard let row = try query(
             "SELECT grouped_events_json FROM prepared_activity_days WHERE day = ? LIMIT 1;",
@@ -639,6 +678,24 @@ public final class SQLiteDatabase: @unchecked Sendable {
 
     public func deleteAllPreparedActivityEvents() throws {
         try execute("DELETE FROM prepared_activity_days;")
+    }
+
+    public func deleteActivityChunks(for days: Set<String>) throws {
+        guard days.isEmpty == false else {
+            return
+        }
+
+        let placeholders = Array(repeating: "?", count: days.count).joined(separator: ",")
+        let sql = "DELETE FROM activity_chunks WHERE day IN (\(placeholders));"
+        try execute(sql, bindings: days.sorted().map(SQLiteValue.text))
+    }
+
+    public func deleteActivityChunksBefore(day: String) throws {
+        try execute("DELETE FROM activity_chunks WHERE day < ?;", bindings: [.text(day)])
+    }
+
+    public func deleteAllActivityChunks() throws {
+        try execute("DELETE FROM activity_chunks;")
     }
 
     private func migrate() throws {
@@ -744,6 +801,25 @@ public final class SQLiteDatabase: @unchecked Sendable {
                 grouped_events_json TEXT NOT NULL,
                 updated_at REAL NOT NULL
             );
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS activity_chunks (
+                id TEXT PRIMARY KEY,
+                day TEXT NOT NULL,
+                started_at REAL NOT NULL,
+                ended_at REAL NOT NULL,
+                bundle_id TEXT NOT NULL,
+                app_name TEXT NOT NULL,
+                title TEXT NOT NULL,
+                url TEXT,
+                excerpt TEXT NOT NULL,
+                is_excluded INTEGER NOT NULL DEFAULT 0,
+                source_event_ids_json TEXT NOT NULL
+            );
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_activity_chunks_day
+            ON activity_chunks(day, started_at, is_excluded);
             """,
         ]
 
@@ -870,6 +946,30 @@ private extension DailyJournal {
             providerID: row.optionalStringValue(for: "provider_id"),
             createdAt: Date(timeIntervalSince1970: row.doubleValue(for: "created_at")),
             updatedAt: Date(timeIntervalSince1970: row.doubleValue(for: "updated_at"))
+        )
+    }
+}
+
+private extension ActivityChunk {
+    init?(row: [String: SQLiteValue], database: SQLiteDatabase) {
+        guard let sourceEventIDsJSON = row.optionalStringValue(for: "source_event_ids_json"),
+              let sourceEventIDs = try? database.decode([String].self, from: sourceEventIDsJSON)
+        else {
+            return nil
+        }
+
+        self.init(
+            id: row.stringValue(for: "id"),
+            day: row.stringValue(for: "day"),
+            startedAt: Date(timeIntervalSince1970: row.doubleValue(for: "started_at")),
+            endedAt: Date(timeIntervalSince1970: row.doubleValue(for: "ended_at")),
+            bundleId: row.stringValue(for: "bundle_id"),
+            appName: row.stringValue(for: "app_name"),
+            title: row.stringValue(for: "title"),
+            url: row.optionalStringValue(for: "url"),
+            excerpt: row.stringValue(for: "excerpt"),
+            isExcluded: row.intValue(for: "is_excluded") == 1,
+            sourceEventIDs: sourceEventIDs
         )
     }
 }
