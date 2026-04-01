@@ -222,8 +222,8 @@ public final class CollectorRuntime: NSObject, @unchecked Sendable {
     }
 
     private func scheduleCapture() {
-        Task { [weak self] in
-            await self?.captureNow()
+        Task {
+            await captureNow()
         }
     }
 

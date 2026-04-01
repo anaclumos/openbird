@@ -230,8 +230,8 @@ public actor OpenbirdStore {
             return
         }
 
-        preparedActivityRefreshTask = Task { [weak self] in
-            await self?.runPreparedActivityRefreshLoop()
+        preparedActivityRefreshTask = Task {
+            await runPreparedActivityRefreshLoop()
         }
     }
 
