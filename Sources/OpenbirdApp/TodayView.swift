@@ -339,6 +339,17 @@ struct TodayView: View {
         let rawEvents = model.rawEvents
         let installedApplications = model.installedApplications
 
+        func buildRawTimelineContent() async -> TimelineContent {
+            let rawItems = await Task.detached(priority: .userInitiated) {
+                Self.buildTimelineItems(
+                    rawEvents: rawEvents,
+                    installedApplications: installedApplications
+                )
+            }.value
+
+            return rawItems.isEmpty ? .empty : .raw(rawItems)
+        }
+
         isPreparingTimeline = true
         timelinePreparationStatus = .groupingActivity
         defer {
@@ -347,18 +358,12 @@ struct TodayView: View {
         }
 
         guard let journal else {
-            let rawItems = await Task.detached(priority: .userInitiated) {
-                Self.buildTimelineItems(
-                    rawEvents: rawEvents,
-                    installedApplications: installedApplications
-                )
-            }.value
-
+            let rawTimelineContent = await buildRawTimelineContent()
             guard Task.isCancelled == false else {
                 return
             }
 
-            timelineContent = rawItems.isEmpty ? .empty : .raw(rawItems)
+            timelineContent = rawTimelineContent
             return
         }
 
@@ -376,18 +381,12 @@ struct TodayView: View {
 
         guard parsedJournal.hasSummaryContent else {
             timelinePreparationStatus = .groupingActivity
-            let rawItems = await Task.detached(priority: .userInitiated) {
-                Self.buildTimelineItems(
-                    rawEvents: rawEvents,
-                    installedApplications: installedApplications
-                )
-            }.value
-
+            let rawTimelineContent = await buildRawTimelineContent()
             guard Task.isCancelled == false else {
                 return
             }
 
-            timelineContent = rawItems.isEmpty ? .empty : .raw(rawItems)
+            timelineContent = rawTimelineContent
             return
         }
 
