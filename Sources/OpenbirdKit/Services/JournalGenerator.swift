@@ -9,14 +9,14 @@ public actor JournalGenerator {
         let heading: String
         let timeRange: String
         let bullets: [String]
-        let groupedEvents: [GroupedActivityEvent]
+        let chunks: [ActivityChunk]
 
         var journalSection: JournalSection {
             JournalSection(
                 heading: heading,
                 timeRange: timeRange,
                 bullets: bullets,
-                sourceEventIDs: groupedEvents.flatMap(\.sourceEventIDs)
+                sourceEventIDs: chunks.flatMap(\.sourceEventIDs)
             )
         }
     }
@@ -27,16 +27,16 @@ public actor JournalGenerator {
 
     public func generate(request: JournalGenerationRequest) async throws -> DailyJournal {
         let day = OpenbirdDateFormatting.dayString(for: request.date)
-        let groupedEvents = try await store.preparedActivityEvents(for: request.date)
+        let activityChunks = try await store.activityChunks(for: request.date)
             .filter { $0.isExcluded == false }
         let preparedSections = compactedSections(
-            from: groupedEvents,
+            from: activityChunks,
             limit: request.maxSourceEvents
         )
         let sections = preparedSections.map(\.journalSection)
         let heuristicMarkdown = renderMarkdown(for: request.date, sections: preparedSections)
         logger.notice(
-            "Generating journal for \(day, privacy: .public); groupedEvents=\(groupedEvents.count, privacy: .public) sections=\(preparedSections.count, privacy: .public)"
+            "Generating journal for \(day, privacy: .public); activityChunks=\(activityChunks.count, privacy: .public) sections=\(preparedSections.count, privacy: .public)"
         )
 
         let providerConfig = try await activeProviderIfAvailable(id: request.providerID)
@@ -88,14 +88,14 @@ public actor JournalGenerator {
     }
 
     private func compactedSections(
-        from events: [GroupedActivityEvent],
+        from chunks: [ActivityChunk],
         limit: Int
     ) -> [PreparedSection] {
         guard limit > 0 else {
             return []
         }
 
-        let sections = buildSections(from: events)
+        let sections = buildSections(from: chunks)
         guard sections.count > limit else {
             return sections
         }
@@ -104,16 +104,16 @@ public actor JournalGenerator {
             .map(mergedSection)
     }
 
-    private func buildSections(from events: [GroupedActivityEvent]) -> [PreparedSection] {
-        guard events.isEmpty == false else { return [] }
-        var groups: [[GroupedActivityEvent]] = [[events[0]]]
-        for event in events.dropFirst() {
+    private func buildSections(from chunks: [ActivityChunk]) -> [PreparedSection] {
+        guard chunks.isEmpty == false else { return [] }
+        var groups: [[ActivityChunk]] = [[chunks[0]]]
+        for chunk in chunks.dropFirst() {
             guard let previous = groups[groups.count - 1].last else { continue }
-            let gap = event.startedAt.timeIntervalSince(previous.endedAt)
-            if gap > 20 * 60 || event.bundleId != previous.bundleId {
-                groups.append([event])
+            let gap = chunk.startedAt.timeIntervalSince(previous.endedAt)
+            if gap > 20 * 60 || chunk.bundleId != previous.bundleId {
+                groups.append([chunk])
             } else {
-                groups[groups.count - 1].append(event)
+                groups[groups.count - 1].append(chunk)
             }
         }
 
@@ -136,10 +136,10 @@ public actor JournalGenerator {
     }
 
     private func mergedSection(_ sections: [PreparedSection]) -> PreparedSection {
-        preparedSection(from: sections.flatMap(\.groupedEvents))
+        preparedSection(from: sections.flatMap(\.chunks))
     }
 
-    private func preparedSection(from group: [GroupedActivityEvent]) -> PreparedSection {
+    private func preparedSection(from group: [ActivityChunk]) -> PreparedSection {
         let dominant = preferredHeading(in: group)
         let bullets = group
             .map(makeBullet(for:))
@@ -152,26 +152,26 @@ public actor JournalGenerator {
             heading: dominant,
             timeRange: "\(start) - \(end)",
             bullets: Array(bullets),
-            groupedEvents: group
+            chunks: group
         )
     }
 
-    private func makeBullet(for event: GroupedActivityEvent) -> String {
-        var pieces = [event.appName]
-        if let detailTitle = event.detailTitle {
-            pieces.append(detailTitle)
+    private func makeBullet(for chunk: ActivityChunk) -> String {
+        var pieces = [chunk.appName]
+        if chunk.title.normalizedComparisonKey != chunk.appName.normalizedComparisonKey {
+            pieces.append(chunk.title)
         }
-        if let urlSummary = ActivityEvidencePreprocessor.summarizedURL(from: event.url) {
+        if let urlSummary = ActivityEvidencePreprocessor.summarizedURL(from: chunk.url) {
             pieces.append(urlSummary)
         }
-        if event.excerpt.isEmpty == false {
-            pieces.append(event.excerpt)
+        if chunk.excerpt.isEmpty == false {
+            pieces.append(chunk.excerpt)
         }
         return pieces.deduplicatedByNormalizedText().joined(separator: " • ")
     }
 
     private func sectionPrompt(_ section: PreparedSection) -> String {
-        let appList = Array(section.groupedEvents.map(\.appName).deduplicatedByNormalizedText())
+        let appList = Array(section.chunks.map(\.appName).deduplicatedByNormalizedText())
 
         return """
         Raw evidence chunk
@@ -188,14 +188,14 @@ public actor JournalGenerator {
     }
 
     private func promptEvidence(for section: PreparedSection) -> String {
-        guard section.groupedEvents.count > 6 else {
-            let evidence = section.groupedEvents.map(eventPrompt)
+        guard section.chunks.count > 6 else {
+            let evidence = section.chunks.map(eventPrompt)
             return evidence.isEmpty ? "- No detailed evidence available." : evidence.joined(separator: "\n")
         }
 
-        var evidence = section.groupedEvents.prefix(2).map(eventPrompt)
+        var evidence = section.chunks.prefix(2).map(eventPrompt)
         evidence.append(contentsOf: section.bullets.map { "- Key cue | \($0)" })
-        evidence.append(contentsOf: section.groupedEvents.suffix(2).map(eventPrompt))
+        evidence.append(contentsOf: section.chunks.suffix(2).map(eventPrompt))
         return evidence
             .deduplicatedByNormalizedText()
             .joined(separator: "\n")
@@ -267,14 +267,14 @@ public actor JournalGenerator {
         """
     }
 
-    private func eventPrompt(_ event: GroupedActivityEvent) -> String {
+    private func eventPrompt(_ event: ActivityChunk) -> String {
         var pieces = [
             "\(OpenbirdDateFormatting.timeString(for: event.startedAt))-\(OpenbirdDateFormatting.timeString(for: event.endedAt))",
             event.appName,
         ]
 
-        if let detailTitle = event.detailTitle {
-            pieces.append(detailTitle)
+        if event.title.normalizedComparisonKey != event.appName.normalizedComparisonKey {
+            pieces.append(event.title)
         }
 
         if let urlSummary = ActivityEvidencePreprocessor.summarizedURL(from: event.url) {
@@ -335,11 +335,11 @@ public actor JournalGenerator {
         }
     }
 
-    private func preferredHeading(in group: [GroupedActivityEvent]) -> String {
+    private func preferredHeading(in group: [ActivityChunk]) -> String {
         guard let appName = group.first?.appName else { return "Activity" }
 
-        let ranked = group.reduce(into: [String: Int]()) { counts, event in
-            let title = event.displayTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ranked = group.reduce(into: [String: Int]()) { counts, chunk in
+            let title = chunk.title.trimmingCharacters(in: .whitespacesAndNewlines)
             guard title.isEmpty == false else { return }
 
             var score = 1
@@ -360,7 +360,7 @@ public actor JournalGenerator {
     }
 
     private func sectionNarrative(for section: PreparedSection) -> String {
-        let apps = Array(section.groupedEvents.map(\.appName).deduplicatedByNormalizedText())
+        let apps = Array(section.chunks.map(\.appName).deduplicatedByNormalizedText())
         let topic = displayTopic(for: section)
         let topicKey = topic.normalizedComparisonKey
         let appKeys = Set(apps.map(\.normalizedComparisonKey))
@@ -396,7 +396,7 @@ public actor JournalGenerator {
     private func displayTopic(for section: PreparedSection) -> String {
         let topic = section.heading.trimmingCharacters(in: .whitespacesAndNewlines)
         guard topic.isEmpty == false else {
-            return section.groupedEvents.first?.appName ?? "Activity"
+            return section.chunks.first?.appName ?? "Activity"
         }
 
         return topic
@@ -445,7 +445,7 @@ public actor JournalGenerator {
             return true
         }
 
-        let appNames = Set(section.groupedEvents.map { $0.appName.normalizedComparisonKey })
+        let appNames = Set(section.chunks.map { $0.appName.normalizedComparisonKey })
         if appNames.contains(normalizedTopic) {
             return true
         }
@@ -456,8 +456,8 @@ public actor JournalGenerator {
     private func bestStoryContext(for section: PreparedSection) -> String? {
         let topicKey = displayTopic(for: section).normalizedComparisonKey
 
-        let detailTitles = section.groupedEvents
-            .compactMap(\.detailTitle)
+        let detailTitles = section.chunks
+            .map(\.title)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter {
                 $0.isEmpty == false &&
@@ -468,7 +468,7 @@ public actor JournalGenerator {
             return detailTitle
         }
 
-        let urls = section.groupedEvents
+        let urls = section.chunks
             .compactMap(\.url)
             .compactMap(ActivityEvidencePreprocessor.summarizedURL(from:))
             .filter { $0.isEmpty == false }
@@ -485,7 +485,7 @@ public actor JournalGenerator {
     }
 
     private func dominantCategory(for section: PreparedSection) -> ActivityCategory {
-        let appNames = Set(section.groupedEvents.map { $0.appName.normalizedComparisonKey })
+        let appNames = Set(section.chunks.map { $0.appName.normalizedComparisonKey })
         if appNames.isDisjoint(with: Self.browserAppLabels) == false {
             return .browser
         }
@@ -499,7 +499,7 @@ public actor JournalGenerator {
     }
 
     private func sectionHighlights(for section: PreparedSection) -> [String] {
-        let excludedLabels = [section.heading] + section.groupedEvents.map(\.appName)
+        let excludedLabels = [section.heading] + section.chunks.map(\.appName)
         let excluded = Set(excludedLabels.map(\.normalizedComparisonKey))
 
         var pieces: [String] = []
