@@ -68,6 +68,21 @@ public actor OpenbirdStore {
         try database.searchActivityEvents(query: query, in: range, appFilters: appFilters, topK: topK)
     }
 
+    public func searchActivityChunks(
+        query: String,
+        in range: ClosedRange<Date>,
+        appFilters: [String] = [],
+        topK: Int = 8
+    ) async throws -> [ActivityChunk] {
+        for day in dayStrings(in: range) {
+            if let date = OpenbirdDateFormatting.date(fromDayString: day) {
+                _ = try await activityChunks(for: date)
+            }
+        }
+
+        return try database.searchActivityChunks(query: query, in: range, appFilters: appFilters, topK: topK)
+    }
+
     public func loadJournal(for day: String) throws -> DailyJournal? {
         try database.loadJournal(for: day)
     }

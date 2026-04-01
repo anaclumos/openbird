@@ -7,6 +7,61 @@ public actor RetrievalService {
         self.store = store
     }
 
+    public func searchChunks(
+        query: String,
+        range: ClosedRange<Date>,
+        appFilters: [String],
+        topK: Int
+    ) async throws -> [ActivityChunk] {
+        let directChunkHits = try await store.searchActivityChunks(
+            query: query,
+            in: range,
+            appFilters: appFilters,
+            topK: topK
+        )
+        if directChunkHits.isEmpty == false {
+            return directChunkHits
+        }
+
+        let eventHits = try await store.searchActivityEvents(
+            query: query,
+            in: range,
+            appFilters: appFilters,
+            topK: topK * 4
+        )
+        guard eventHits.isEmpty == false else {
+            return []
+        }
+
+        var chunksBySourceEventID: [String: ActivityChunk] = [:]
+        for day in daysCovered(by: range) {
+            let chunks = try await store.activityChunks(for: day)
+            for chunk in chunks {
+                for sourceEventID in chunk.sourceEventIDs {
+                    chunksBySourceEventID[sourceEventID] = chunk
+                }
+            }
+        }
+
+        var rankedChunks: [ActivityChunk] = []
+        var seenChunkIDs = Set<String>()
+        for event in eventHits {
+            guard var chunk = chunksBySourceEventID[event.id],
+                  seenChunkIDs.insert(chunk.id).inserted else {
+                continue
+            }
+            if event.excerpt.isEmpty == false {
+                chunk.excerpt = event.excerpt
+            }
+            rankedChunks.append(chunk)
+            if rankedChunks.count == topK {
+                break
+            }
+        }
+
+        return rankedChunks
+    }
+
     public func search(
         query: String,
         range: ClosedRange<Date>,
@@ -71,5 +126,22 @@ public actor RetrievalService {
         let rhsMagnitude = sqrt(rhs.map { $0 * $0 }.reduce(0, +))
         guard lhsMagnitude > 0, rhsMagnitude > 0 else { return -1 }
         return dot / (lhsMagnitude * rhsMagnitude)
+    }
+
+    private func daysCovered(by range: ClosedRange<Date>) -> [Date] {
+        var dates: [Date] = []
+        let calendar = Calendar.current
+        var current = calendar.startOfDay(for: range.lowerBound)
+        let last = calendar.startOfDay(for: range.upperBound)
+
+        while current <= last {
+            dates.append(current)
+            guard let next = calendar.date(byAdding: .day, value: 1, to: current) else {
+                break
+            }
+            current = next
+        }
+
+        return dates
     }
 }

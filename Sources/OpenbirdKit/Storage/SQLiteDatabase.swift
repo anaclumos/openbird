@@ -605,8 +605,50 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
     }
 
+    public func searchActivityChunks(
+        query searchTerm: String,
+        in range: ClosedRange<Date>,
+        appFilters: [String],
+        topK: Int
+    ) throws -> [ActivityChunk] {
+        guard let ftsQuery = makeFTSQuery(from: searchTerm) else {
+            return []
+        }
+
+        var sql = """
+        SELECT activity_chunks.*
+        FROM activity_chunks
+        JOIN activity_chunks_fts ON activity_chunks.id = activity_chunks_fts.id
+        WHERE activity_chunks_fts MATCH ?
+        AND activity_chunks.started_at <= ?
+        AND activity_chunks.ended_at >= ?
+        AND activity_chunks.is_excluded = 0
+        """
+        var bindings: [SQLiteValue] = [
+            .text(ftsQuery),
+            .double(range.upperBound.timeIntervalSince1970),
+            .double(range.lowerBound.timeIntervalSince1970),
+        ]
+
+        if appFilters.isEmpty == false {
+            sql += " AND activity_chunks.bundle_id IN (\(Array(repeating: "?", count: appFilters.count).joined(separator: ",")))"
+            bindings += appFilters.map(SQLiteValue.text)
+        }
+
+        sql += " ORDER BY bm25(activity_chunks_fts), activity_chunks.started_at DESC LIMIT ?;"
+        bindings.append(.integer(Int64(topK)))
+
+        return try query(sql, bindings: bindings).compactMap { row in
+            ActivityChunk(row: row, database: self)
+        }
+    }
+
     public func saveActivityChunks(_ chunks: [ActivityChunk], for day: String) throws {
         try withImmediateTransaction {
+            try execute(
+                "DELETE FROM activity_chunks_fts WHERE id IN (SELECT id FROM activity_chunks WHERE day = ?);",
+                bindings: [.text(day)]
+            )
             try execute("DELETE FROM activity_chunks WHERE day = ?;", bindings: [.text(day)])
 
             for chunk in chunks {
@@ -629,6 +671,19 @@ public final class SQLiteDatabase: @unchecked Sendable {
                         .text(chunk.excerpt),
                         .integer(chunk.isExcluded ? 1 : 0),
                         .text(sourceEventIDs),
+                    ]
+                )
+                try execute(
+                    """
+                    INSERT INTO activity_chunks_fts (id, app_name, title, url, excerpt)
+                    VALUES (?, ?, ?, ?, ?);
+                    """,
+                    bindings: [
+                        .text(chunk.id),
+                        .text(chunk.appName),
+                        .text(chunk.title),
+                        chunk.url.map(SQLiteValue.text) ?? .text(""),
+                        .text(chunk.excerpt),
                     ]
                 )
             }
@@ -686,15 +741,24 @@ public final class SQLiteDatabase: @unchecked Sendable {
         }
 
         let placeholders = Array(repeating: "?", count: days.count).joined(separator: ",")
-        let sql = "DELETE FROM activity_chunks WHERE day IN (\(placeholders));"
-        try execute(sql, bindings: days.sorted().map(SQLiteValue.text))
+        let bindings = days.sorted().map(SQLiteValue.text)
+        try execute(
+            "DELETE FROM activity_chunks_fts WHERE id IN (SELECT id FROM activity_chunks WHERE day IN (\(placeholders)));",
+            bindings: bindings
+        )
+        try execute("DELETE FROM activity_chunks WHERE day IN (\(placeholders));", bindings: bindings)
     }
 
     public func deleteActivityChunksBefore(day: String) throws {
+        try execute(
+            "DELETE FROM activity_chunks_fts WHERE id IN (SELECT id FROM activity_chunks WHERE day < ?);",
+            bindings: [.text(day)]
+        )
         try execute("DELETE FROM activity_chunks WHERE day < ?;", bindings: [.text(day)])
     }
 
     public func deleteAllActivityChunks() throws {
+        try execute("DELETE FROM activity_chunks_fts;")
         try execute("DELETE FROM activity_chunks;")
     }
 
@@ -820,6 +884,10 @@ public final class SQLiteDatabase: @unchecked Sendable {
             """
             CREATE INDEX IF NOT EXISTS idx_activity_chunks_day
             ON activity_chunks(day, started_at, is_excluded);
+            """,
+            """
+            CREATE VIRTUAL TABLE IF NOT EXISTS activity_chunks_fts
+            USING fts5(id UNINDEXED, app_name, title, url, excerpt, tokenize='unicode61');
             """,
         ]
 
