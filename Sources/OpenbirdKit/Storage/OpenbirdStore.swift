@@ -142,14 +142,13 @@ public actor OpenbirdStore {
 
     public func activityChunks(for date: Date) async throws -> [ActivityChunk] {
         let day = OpenbirdDateFormatting.dayString(for: date)
-        if dirtyPreparedActivityDays.contains(day) == false {
+        if let preparedEvents = try cachedPreparedActivityEventsIfFresh(for: day) {
             let cachedChunks = try database.loadActivityChunks(for: day)
             if cachedChunks.isEmpty == false {
                 return cachedChunks
             }
 
-            if let preparedEvents = try database.loadPreparedActivityEvents(for: day),
-               preparedEvents.isEmpty {
+            if preparedEvents.isEmpty {
                 return []
             }
         }
@@ -160,8 +159,7 @@ public actor OpenbirdStore {
 
     public func preparedActivityEvents(for date: Date) async throws -> [GroupedActivityEvent] {
         let day = OpenbirdDateFormatting.dayString(for: date)
-        if dirtyPreparedActivityDays.contains(day) == false,
-           let cached = try database.loadPreparedActivityEvents(for: day) {
+        if let cached = try cachedPreparedActivityEventsIfFresh(for: day) {
             return cached
         }
 
@@ -210,12 +208,7 @@ public actor OpenbirdStore {
             return
         }
 
-        let daysNeedingRefresh = normalizedDays.filter { day in
-            if dirtyPreparedActivityDays.contains(day) {
-                return true
-            }
-            return (try? database.loadPreparedActivityEvents(for: day)) == nil
-        }
+        let daysNeedingRefresh = normalizedDays.filter(needsPreparedActivityRefresh)
 
         guard daysNeedingRefresh.isEmpty == false else {
             return
@@ -272,6 +265,22 @@ public actor OpenbirdStore {
 
     private func dayStringsCovered(by event: ActivityEvent) -> Set<String> {
         dayStrings(in: event.startedAt...event.endedAt)
+    }
+
+    private func cachedPreparedActivityEventsIfFresh(for day: String) throws -> [GroupedActivityEvent]? {
+        guard dirtyPreparedActivityDays.contains(day) == false else {
+            return nil
+        }
+
+        return try database.loadPreparedActivityEvents(for: day)
+    }
+
+    private func needsPreparedActivityRefresh(for day: String) -> Bool {
+        if dirtyPreparedActivityDays.contains(day) {
+            return true
+        }
+
+        return (try? database.loadPreparedActivityEvents(for: day)) == nil
     }
 
     private func recentDayStrings(endingAt date: Date, dayCount: Int) -> Set<String> {
