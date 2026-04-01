@@ -564,11 +564,7 @@ final class AppModel: ObservableObject {
 
         let day = OpenbirdDateFormatting.dayString(for: selectedDay)
         logger.notice("Starting a new chat for \(day, privacy: .public)")
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-
+        Task {
             do {
                 let thread = try await chatService.createThread(for: day)
                 guard OpenbirdDateFormatting.dayString(for: selectedDay) == day else {
@@ -607,11 +603,7 @@ final class AppModel: ObservableObject {
         updateStatusMessage = "Installing Openbird \(availableUpdate.version)…"
         logger.notice("Installing Openbird update \(availableUpdate.version, privacy: .public)")
 
-        Task { [weak self] in
-            guard let self else {
-                return
-            }
-
+        Task {
             do {
                 try await appUpdater.install(
                     update: availableUpdate,
@@ -696,18 +688,14 @@ final class AppModel: ObservableObject {
 
         let requestID = UUID()
         providerConnectionRequestID = requestID
-        providerConnectionTask = Task { [weak self] in
+        providerConnectionTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(600))
             } catch {
                 return
             }
 
-            guard let self else {
-                return
-            }
-
-            await self.performProviderConnectionCheck(
+            await performProviderConnectionCheck(
                 using: config,
                 requestID: requestID
             )
@@ -718,18 +706,14 @@ final class AppModel: ObservableObject {
         let provider = sanitizedProviderConfig(editingProvider)
         cancelPendingProviderSave()
 
-        providerSaveTask = Task { [weak self] in
+        providerSaveTask = Task {
             do {
                 try await Task.sleep(for: .milliseconds(300))
             } catch {
                 return
             }
 
-            guard let self else {
-                return
-            }
-
-            await self.persistProvider(provider, activate: false)
+            await persistProvider(provider, activate: false)
         }
     }
 
@@ -952,12 +936,8 @@ final class AppModel: ObservableObject {
         let requestID = UUID()
         updateCheckRequestID = requestID
         updateCheckTask?.cancel()
-        updateCheckTask = Task { [weak self] in
-            guard let self else {
-                return
-            }
-
-            await self.performUpdateCheck(
+        updateCheckTask = Task {
+            await performUpdateCheck(
                 currentVersion: appVersion,
                 requestID: requestID,
                 force: force,
@@ -1213,11 +1193,7 @@ final class AppModel: ObservableObject {
         logger.notice("Sending chat message length=\(question.count, privacy: .public)")
 
         chatSendTask?.cancel()
-        chatSendTask = Task { [weak self] in
-            guard let self else {
-                return
-            }
-
+        chatSendTask = Task {
             do {
                 let query = ChatQuery(
                     threadID: thread.id,

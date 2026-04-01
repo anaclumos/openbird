@@ -50,14 +50,11 @@ final class AppLifecycleController: NSObject, NSApplicationDelegate {
 
         isHandlingTermination = true
         logger.notice("Preparing for application termination")
-        Task { [weak self] in
-            guard let self else { return }
+        Task {
             await prepareForTermination()
-            await MainActor.run {
-                isHandlingTermination = false
-                logger.notice("Application termination cleanup finished")
-                sender.reply(toApplicationShouldTerminate: true)
-            }
+            isHandlingTermination = false
+            logger.notice("Application termination cleanup finished")
+            sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
     }
